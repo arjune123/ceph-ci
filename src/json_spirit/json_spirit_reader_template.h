@@ -620,7 +620,9 @@ namespace json_spirit
     {
         typename String_type::const_iterator begin = s.begin();
 
-        return read_range( begin, s.end(), value );
+        // Make sure the entire string is read to consider it as success.
+        bool success = read_range( begin, s.end(), value );
+        return (success && begin == s.end());
     }
 
     // reads a JSON Value from a string throwing an exception on invalid input, e.g.
