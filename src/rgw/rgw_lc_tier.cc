@@ -909,9 +909,14 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
         init_multipart = true;
         status.obj_size = obj_size;
 #define MULTIPART_MAX_PARTS 10000
-        //        uint64_t min_part_size = obj_size / MULTIPART_MAX_PARTS;
-        //status.part_size = std::max(conf.s3.multipart_min_part_size, min_part_size);
-        status.part_size = MULTIPART_MIN_POSSIBLE_PART_SIZE;
+        uint64_t min_part_size = obj_size / MULTIPART_MAX_PARTS;
+        uint64_t min_conf_size = tier_ctx.multipart_min_part_size;
+
+        if (min_conf_size < MULTIPART_MIN_POSSIBLE_PART_SIZE) {
+          min_conf_size = MULTIPART_MIN_POSSIBLE_PART_SIZE;
+        }
+
+        status.part_size = std::max(min_conf_size, min_part_size);
         status.num_parts = (obj_size + status.part_size - 1) / status.part_size;
         status.cur_part = 1;
       }
@@ -1015,7 +1020,13 @@ int RGWLCCloudTierCR::operate() {
 
     yield {
       uint64_t size = tier_ctx.o.meta.size;
-      if (size < DEFAULT_MULTIPART_SYNC_PART_SIZE) {
+      uint64_t multipart_sync_threshold = tier_ctx.multipart_sync_threshold;
+
+      if (multipart_sync_threshold < MULTIPART_MIN_POSSIBLE_PART_SIZE) {
+        multipart_sync_threshold = MULTIPART_MIN_POSSIBLE_PART_SIZE;
+      }
+
+      if (size < multipart_sync_threshold) {
         call (new RGWLCStreamObjToCloudPlainCR(tier_ctx));
       } else {
         call(new RGWLCStreamObjToCloudMultipartCR(tier_ctx));

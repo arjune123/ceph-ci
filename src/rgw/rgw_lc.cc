@@ -1304,6 +1304,8 @@ public:
                         oc.obj, oc.rctx, conn, bucket_name, oc.tier.tier_storage_class,
                         &http_manager);
     tier_ctx.acl_mappings = oc.tier.acl_mappings;
+    tier_ctx.multipart_min_part_size = oc.tier.multipart_min_part_size;
+    tier_ctx.multipart_sync_threshold = oc.tier.multipart_sync_threshold;
 
     ret = crs.run(new RGWLCCloudTierCR(tier_ctx));
     http_manager.stop();

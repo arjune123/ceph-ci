@@ -12,6 +12,9 @@
 #include "rgw_rados.h"
 #include "rgw_zone.h"
 
+#define DEFAULT_MULTIPART_SYNC_PART_SIZE (32 * 1024 * 1024)
+#define MULTIPART_MIN_POSSIBLE_PART_SIZE (5 * 1024 * 1024)
+
 struct RGWLCCloudTierCtx {
   CephContext *cct;
 
@@ -30,6 +33,8 @@ struct RGWLCCloudTierCtx {
   RGWHTTPManager *http_manager;
 
   map<string, RGWTierACLMapping> acl_mappings;
+  uint64_t multipart_min_part_size;
+  uint64_t multipart_sync_threshold;
 
   RGWLCCloudTierCtx(CephContext* _cct, rgw_bucket_dir_entry& _o,
             rgw::sal::RGWRadosStore* _store, RGWBucketInfo &_binfo, rgw_obj _obj,
@@ -160,9 +165,5 @@ struct rgw_lc_multipart_upload_info {
   }
 };
 WRITE_CLASS_ENCODER(rgw_lc_multipart_upload_info)
-
-
-#define DEFAULT_MULTIPART_SYNC_PART_SIZE (5 * 1024 * 1024)
-#define MULTIPART_MIN_POSSIBLE_PART_SIZE (5 * 1024 * 1024)
 
 #endif
