@@ -27,7 +27,7 @@
 #include "rgw_string.h"
 #include "rgw_multi.h"
 #include "rgw_sal.h"
-#include "rgw_sal.h"
+#include "rgw_lc_tier.h"
 
 // this seems safe to use, at least for now--arguably, we should
 // prefer header-only fmt, in general
@@ -538,6 +538,8 @@ struct lc_op_ctx {
   RGWObjectCtx rctx;
   const DoutPrefixProvider *dpp;
   WorkQ* wq;
+
+  RGWZoneGroupPlacementTier tier = {};
 
   lc_op_ctx(op_env& env, rgw_bucket_dir_entry& o,
 	    boost::optional<std::string> next_key_name,
@@ -1250,8 +1252,8 @@ public:
   }
 
  /* find out if the the storage class is remote cloud */
- int get_tier_target(const RGWZoneGroup &zonegroup, rgw_placement_rule rule,
-         string storage_class, RGWZoneGroupPlacementTier &tier) {
+ int get_tier_target(const RGWZoneGroup &zonegroup, rgw_placement_rule& rule,
+         string& storage_class, RGWZoneGroupPlacementTier &tier) {
    std::map<std::string, RGWZoneGroupPlacementTarget>::const_iterator titer;
    titer = zonegroup.placement_targets.find(rule.name);
    if (titer == zonegroup.placement_targets.end()) {
@@ -1271,22 +1273,68 @@ public:
 
    return 0;
  }
+  int transition_obj_to_cloud(lc_op_ctx& oc) {
+    std::shared_ptr<RGWRESTConn> conn;
+
+    /* init */
+    string id = "cloudid";
+    string endpoint=oc.tier.endpoint; 
+    RGWAccessKey key = oc.tier.key;
+    HostStyle host_style = oc.tier.host_style;
+    string bucket_name = oc.tier.target_path;
+   
+    if (bucket_name.empty()) {
+      bucket_name = "cloud-bucket";
+    }
+
+    conn.reset(new S3RESTConn(oc.cct, oc.store->svc()->zone,
+                                id, { endpoint }, key, host_style));
+
+    /* http_mngr */
+    RGWCoroutinesManager crs(oc.store->ctx(), oc.store->getRados()->get_cr_registry());
+    RGWHTTPManager http_manager(oc.store->ctx(), crs.get_completion_mgr());
+
+    int ret = http_manager.start();
+    if (ret < 0) {
+      ldpp_dout(oc.dpp, 0) << "failed in http_manager.start() ret=" << ret << dendl;
+      return ret;
+    }
+
+    RGWLCCloudTierCtx tier_ctx(oc.cct, oc.o, oc.store, oc.bucket_info,
+                        oc.obj, oc.rctx, conn, bucket_name, oc.tier.tier_storage_class,
+                        &http_manager);
+    tier_ctx.acl_mappings = oc.tier.acl_mappings;
+
+    ret = crs.run(new RGWLCCloudTierCR(tier_ctx));
+    http_manager.stop();
+         
+    if (ret < 0) {
+      ldpp_dout(oc.dpp, 0) << "failed in RGWCloudTierCR() ret=" << ret << dendl;
+      return ret;
+    }
+
+    return 0;
+  }
 
   int process(lc_op_ctx& oc) {
     auto& o = oc.o;
     int r;
     std::string tier_type = ""; 
     const RGWZoneGroup& zonegroup = oc.store->svc()->zone->get_zonegroup();
-    RGWZoneGroupPlacementTier tier = {};
 
     rgw_placement_rule target_placement;
     target_placement.inherit_from(oc.bucket->get_placement_rule());
     target_placement.storage_class = transition.storage_class;
 
-    r = get_tier_target(zonegroup, target_placement, target_placement.storage_class, tier);
+    r = get_tier_target(zonegroup, target_placement, target_placement.storage_class, oc.tier);
 
-    if (tier.tier_type == "cloud") {
+    if (!r && oc.tier.tier_type == "cloud") {
          ldpp_dout(oc.dpp, 0) << "Found cloud tier: " << target_placement.storage_class << dendl;
+        r = transition_obj_to_cloud(oc);
+        if (r < 0) {
+            ldpp_dout(oc.dpp, 0) << "ERROR: failed to transition obj to cloud (r=" << r << ")"
+                               << dendl;
+        }
     } else {
       if (!oc.store->get_zone()->get_params().
   	    valid_placement(target_placement)) {
