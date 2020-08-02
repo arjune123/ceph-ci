@@ -1457,6 +1457,7 @@ void RGWZoneGroupPlacementTier::dump(Formatter *f) const
   encode_json("acl_mappings", acl_mappings, f);
   encode_json("multipart_sync_threshold", multipart_sync_threshold, f);
   encode_json("multipart_min_part_size", multipart_min_part_size, f);
+  encode_json("retain_object", retain_object, f);
 }
 
 void RGWZoneGroupPlacementTier::decode_json(JSONObj *obj)
@@ -1478,6 +1479,7 @@ void RGWZoneGroupPlacementTier::decode_json(JSONObj *obj)
   JSONDecoder::decode_json("acl_mappings", acl_mappings, obj);
   JSONDecoder::decode_json("multipart_sync_threshold", multipart_sync_threshold, obj);
   JSONDecoder::decode_json("multipart_min_part_size", multipart_min_part_size, obj);
+  JSONDecoder::decode_json("retain_object", retain_object, obj);
 }
 
 void RGWZoneGroupPlacementTarget::dump(Formatter *f) const

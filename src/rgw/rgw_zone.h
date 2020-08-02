@@ -761,6 +761,8 @@ struct RGWZoneGroupPlacementTier {
   uint64_t multipart_sync_threshold{DEFAULT_MULTIPART_SYNC_PART_SIZE};
   uint64_t multipart_min_part_size{DEFAULT_MULTIPART_SYNC_PART_SIZE};
 
+  bool retain_object = false;
+
   int update_params(const JSONFormattable& config);
   int clear_params(const JSONFormattable& config);
 
@@ -777,6 +779,7 @@ struct RGWZoneGroupPlacementTier {
     encode(acl_mappings, bl);
     encode(multipart_sync_threshold, bl);
     encode(multipart_min_part_size, bl);
+    encode(retain_object, bl);
     ENCODE_FINISH(bl);
   }
 
@@ -798,6 +801,7 @@ struct RGWZoneGroupPlacementTier {
     decode(acl_mappings, bl);
     decode(multipart_sync_threshold, bl);
     decode(multipart_min_part_size, bl);
+    decode(retain_object, bl);
     DECODE_FINISH(bl);
   }
   void dump(Formatter *f) const;
