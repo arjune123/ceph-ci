@@ -96,6 +96,126 @@ static void init_headers(map<string, bufferlist>& attrs,
   }
 }
 
+static int do_decode_rest_obj(CephContext *cct, map<string, bufferlist>& attrs, map<string, string>& headers, rgw_rest_obj *info)
+{
+  for (auto header : headers) {
+    const string& val = header.second;
+    if (header.first == "RGWX_OBJECT_SIZE") {
+      info->content_len = atoi(val.c_str());
+    } else {
+      info->attrs[header.first] = val;
+    }
+  }
+
+  info->acls.set_ctx(cct);
+  auto aiter = attrs.find(RGW_ATTR_ACL);
+  if (aiter != attrs.end()) {
+    bufferlist& bl = aiter->second;
+    auto bliter = bl.cbegin();
+    try {
+      info->acls.decode(bliter);
+    } catch (buffer::error& err) {
+      ldout(cct, 0) << "ERROR: failed to decode policy off attrs" << dendl;
+      return -EIO;
+    }
+  } else {
+    ldout(cct, 0) << "WARNING: acl attrs not provided" << dendl;
+  }
+
+  return 0;
+}
+
+class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
+{
+  RGWRESTConn::get_obj_params req_params;
+
+  CephContext *cct;
+  RGWHTTPManager *http_manager;
+  rgw_lc_obj_properties obj_properties;
+  std::shared_ptr<RGWRESTConn> conn;
+  rgw::sal::RGWObject* dest_obj;
+  string etag;
+
+public:
+  RGWLCStreamGetCRF(CephContext *_cct,
+      RGWCoroutinesEnv *_env,
+      RGWCoroutine *_caller,
+      RGWHTTPManager *_http_manager,
+      const rgw_lc_obj_properties&  _obj_properties,
+      std::shared_ptr<RGWRESTConn> _conn,
+      rgw::sal::RGWObject* _dest_obj) :
+    RGWStreamReadHTTPResourceCRF(_cct, _env, _caller, _http_manager, _dest_obj->get_key()),
+    cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties), conn(_conn), dest_obj(_dest_obj) {
+    }
+
+
+
+  int init() override {
+    /* init input connection */
+
+    req_params.get_op = false; /* Need only headers */
+    req_params.prepend_metadata = true;
+
+//    req_params.unmod_ptr = &src_properties.mtime;
+//    req_params.etag = src_properties.etag;
+//    req_params.mod_zone_id = src_properties.zone_short_id;
+//    req_params.mod_pg_ver = src_properties.pg_ver;
+
+//    if (range.is_set) {
+//      req_params.range_is_set = true;
+//      req_params.range_start = range.ofs;
+//      req_params.range_end = range.ofs + range.size - 1;
+//    }
+
+    RGWRESTStreamRWRequest *in_req;
+    int ret = conn->get_obj(dest_obj, req_params, false /* send */, &in_req);
+    if (ret < 0) {
+      ldout(cct, 0) << "ERROR: " << __func__ << "(): conn->get_obj() returned ret=" << ret << dendl;
+      return ret;
+    }
+
+    set_req(in_req);
+
+    return RGWStreamReadHTTPResourceCRF::init();
+  }
+
+  int decode_rest_obj(map<string, string>& headers, bufferlist& extra_data) override {
+    map<string, bufferlist> src_attrs;
+
+    ldout(cct, 20) << __func__ << ":" << " headers=" << headers << " extra_data.length()=" << extra_data.length() << dendl;
+
+    if (extra_data.length() > 0) {
+      JSONParser jp;
+      if (!jp.parse(extra_data.c_str(), extra_data.length())) {
+        ldout(cct, 0) << "ERROR: failed to parse response extra data. len=" << extra_data.length() << " data=" << extra_data.c_str() << dendl;
+        return -EIO;
+      }
+
+      JSONDecoder::decode_json("attrs", src_attrs, &jp);
+    }
+    return do_decode_rest_obj(cct, src_attrs, headers, &rest_obj);
+  }
+
+  int is_already_tiered() {
+    char buf[32];
+    utime_t ut(obj_properties.mtime);
+    snprintf(buf, sizeof(buf), "%lld.%09lld",
+        (long long)ut.sec(),
+        (long long)ut.nsec());
+
+    string s = rest_obj.attrs["x-amz-meta-rgwx-source-mtime"];
+
+    if (!s.empty() && !strcmp(s.c_str(), buf)){
+	    return 1;
+    }
+    return 0;
+  }
+
+  bool need_extra_data() override {
+    return true;
+  }
+};
+
 class RGWLCStreamReadCRF : public RGWStreamReadCRF
 {
   CephContext *cct;
