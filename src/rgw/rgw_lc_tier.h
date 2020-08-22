@@ -22,6 +22,7 @@ struct RGWLCCloudTierCtx {
   rgw_bucket_dir_entry& o;
   rgw::sal::RGWRadosStore *store;
   RGWBucketInfo& bucket_info;
+  string storage_class;
 
   rgw_obj obj;
   RGWObjectCtx& rctx;
@@ -49,7 +50,6 @@ class RGWLCCloudTierCR : public RGWCoroutine {
   RGWLCCloudTierCtx& tier_ctx;
   bufferlist out_bl;
   int retcode;
-  bool bucket_created = false;
   struct CreateBucketResult {
     string code;
 

@@ -966,46 +966,64 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
   }
 };
 
+map <pair<string, string>, utime_t> target_buckets;
+
 int RGWLCCloudTierCR::operate() {
+  pair<string, string> key(tier_ctx.storage_class, tier_ctx.target_bucket_name);
+  bool bucket_created = false;
+  
   reenter(this) {
 
-    yield {
-      // xxx: find if bucket is already created
-      ldout(tier_ctx.cct,0) << "Cloud_tier_ctx: creating bucket " << tier_ctx.target_bucket_name << dendl;
-      bufferlist bl;
-      call(new RGWPutRawRESTResourceCR <bufferlist> (tier_ctx.cct, tier_ctx.conn.get(),
+    if (target_buckets.find(key) != target_buckets.end()) {
+      utime_t t = target_buckets[key];
+
+      utime_t now = ceph_clock_now();
+
+      if (now - t <  (2 * cct->_conf->rgw_lc_debug_interval)) { /* not expired */
+        bucket_created = true;
+      }
+    }
+
+    if (!bucket_created){
+      yield {
+        ldout(tier_ctx.cct,0) << "Cloud_tier_ctx: creating bucket " << tier_ctx.target_bucket_name << dendl;
+        bufferlist bl;
+        call(new RGWPutRawRESTResourceCR <bufferlist> (tier_ctx.cct, tier_ctx.conn.get(),
             tier_ctx.http_manager,
             tier_ctx.target_bucket_name, nullptr, bl, &out_bl));
+      }
+      if (retcode < 0 ) {
+        RGWXMLDecoder::XMLParser parser;
+        if (!parser.init()) {
+          ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize xml parser for parsing create_bucket response from server" << dendl;
+          return set_cr_error(retcode);
+        }
+
+        if (!parser.parse(out_bl.c_str(), out_bl.length(), 1)) {
+          string str(out_bl.c_str(), out_bl.length());
+          ldout(tier_ctx.cct, 5) << "ERROR: failed to parse xml: " << str << dendl;
+          return set_cr_error(retcode);
+        }
+
+        try {
+          RGWXMLDecoder::decode_xml("Error", result, &parser, true);
+        } catch (RGWXMLDecoder::err& err) {
+          string str(out_bl.c_str(), out_bl.length());
+          ldout(tier_ctx.cct, 5) << "ERROR: unexpected xml: " << str << dendl;
+          return set_cr_error(retcode);
+        }
+
+        if (result.code != "BucketAlreadyOwnedByYou") {
+          return set_cr_error(retcode);
+        }
+      }
+
+      target_buckets[key] = ceph_clock_now();
     }
-    if (retcode < 0 ) {
-      RGWXMLDecoder::XMLParser parser;
-      if (!parser.init()) {
-        ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize xml parser for parsing create_bucket response from server" << dendl;
-        return set_cr_error(retcode);
-      }
 
-      if (!parser.parse(out_bl.c_str(), out_bl.length(), 1)) {
-        string str(out_bl.c_str(), out_bl.length());
-        ldout(tier_ctx.cct, 5) << "ERROR: failed to parse xml: " << str << dendl;
-        return set_cr_error(retcode);
-      }
-
-      try {
-        RGWXMLDecoder::decode_xml("Error", result, &parser, true);
-      } catch (RGWXMLDecoder::err& err) {
-        string str(out_bl.c_str(), out_bl.length());
-        ldout(tier_ctx.cct, 5) << "ERROR: unexpected xml: " << str << dendl;
-        return set_cr_error(retcode);
-      }
-
-      if ((result.code != "BucketAlreadyOwnedByYou") &&
-          (result.code != "BucketAlreadyExists")) {
-        return set_cr_error(retcode);
-      }
-    }
-
-    bucket_created = true;
-
+    /* XXX: even if target_bucket doesnt exist and transition fails, this
+     * co-routine is still returning success..
+     */
     yield {
       uint64_t size = tier_ctx.o.meta.size;
       uint64_t multipart_sync_threshold = tier_ctx.multipart_sync_threshold;
