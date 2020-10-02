@@ -1391,7 +1391,19 @@ public:
     tier_ctx.multipart_sync_threshold = oc.tier.multipart_sync_threshold;
     tier_ctx.storage_class = oc.tier.storage_class;
 
-    ret = crs.run(new RGWLCCloudTierCR(tier_ctx));
+    bool al_tiered = false;
+    ret = crs.run(new RGWLCCloudCheckCR(tier_ctx, &al_tiered));
+    
+    if (ret < 0) {
+      ldpp_dout(oc.dpp, 0) << "XXXXXXXXXXXXXX failed in RGWCloudCheckCR() ret=" << ret << dendl;
+    }
+
+    if (!al_tiered) {
+        ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX lc.cc is_already_tiered false" << dendl;
+	   ret = crs.run(new RGWLCCloudTierCR(tier_ctx));
+    } else {
+        ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX lc.cc is_already_tiered true" << dendl;
+    }
     http_manager.stop();
          
     if (ret < 0) {

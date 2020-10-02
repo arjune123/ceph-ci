@@ -65,6 +65,20 @@ class RGWLCCloudTierCR : public RGWCoroutine {
     int operate() override;
 };
 
+class RGWLCCloudCheckCR : public RGWCoroutine {
+  RGWLCCloudTierCtx& tier_ctx;
+  bufferlist bl;
+  bool need_retry{false};
+  int retcode;
+  bool *already_tiered;
+
+  public:
+    RGWLCCloudCheckCR(RGWLCCloudTierCtx& _tier_ctx, bool *_al_ti) :
+          RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx), already_tiered(_al_ti) {}
+
+    int operate() override;
+};
+
 struct rgw_lc_multipart_part_info {
   int part_num{0};
   uint64_t ofs{0};

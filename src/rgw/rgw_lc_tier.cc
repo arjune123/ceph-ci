@@ -135,6 +135,8 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
   std::shared_ptr<RGWRESTConn> conn;
   rgw::sal::RGWObject* dest_obj;
   string etag;
+  RGWRESTStreamRWRequest *in_req;
+  map<string, string> headers;
 
 public:
   RGWLCStreamGetCRF(CephContext *_cct,
@@ -154,7 +156,11 @@ public:
     /* init input connection */
 
     req_params.get_op = false; /* Need only headers */
+//    req_params.skip_decrypt = false;
     req_params.prepend_metadata = true;
+    req_params.rgwx_stat = true;
+    req_params.sync_manifest = true;
+    req_params.skip_decrypt = true;
 
 //    req_params.unmod_ptr = &src_properties.mtime;
 //    req_params.etag = src_properties.etag;
@@ -167,7 +173,6 @@ public:
 //      req_params.range_end = range.ofs + range.size - 1;
 //    }
 
-    RGWRESTStreamRWRequest *in_req;
     int ret = conn->get_obj(dest_obj, req_params, false /* send */, &in_req);
     if (ret < 0) {
       ldout(cct, 0) << "ERROR: " << __func__ << "(): conn->get_obj() returned ret=" << ret << dendl;
@@ -177,6 +182,48 @@ public:
     set_req(in_req);
 
     return RGWStreamReadHTTPResourceCRF::init();
+  }
+
+  int init2()  {
+    /* init input connection */
+
+    req_params.get_op = false; /* Need only headers */
+//    req_params.skip_decrypt = false;
+    req_params.prepend_metadata = true;
+    req_params.rgwx_stat = true;
+    req_params.sync_manifest = true;
+    req_params.skip_decrypt = true;
+
+//    req_params.unmod_ptr = &src_properties.mtime;
+//    req_params.etag = src_properties.etag;
+//    req_params.mod_zone_id = src_properties.zone_short_id;
+//    req_params.mod_pg_ver = src_properties.pg_ver;
+
+//    if (range.is_set) {
+//      req_params.range_is_set = true;
+//      req_params.range_start = range.ofs;
+//      req_params.range_end = range.ofs + range.size - 1;
+//    }
+
+  string etag;
+  real_time set_mtime;
+
+    int ret = conn->get_obj(dest_obj, req_params, true /* send */, &in_req);
+    if (ret < 0) {
+      ldout(cct, 0) << "ERROR: " << __func__ << "(): conn->get_obj() returned ret=" << ret << dendl;
+      return ret;
+    }
+
+  ret = conn->complete_request(in_req, nullptr, nullptr,
+                               nullptr, nullptr, &headers);
+  if (ret < 0 && ret != -ENOENT) {
+      ldout(cct, 0) << "ERROR: " << __func__ << "(): XXXXXXXXXXXX conn->complete_request() returned ret=" << ret << dendl;
+      return ret;
+  }
+ //   set_req(in_req);
+
+   // return RGWStreamReadHTTPResourceCRF::init();
+   return 0;
   }
 
   int decode_rest_obj(map<string, string>& headers, bufferlist& extra_data) override {
@@ -196,15 +243,49 @@ public:
     return do_decode_rest_obj(cct, src_attrs, headers, &rest_obj);
   }
 
+  void handle_headers(const map<string, string>& _headers) {
+    headers = _headers;
+  }
+
   int is_already_tiered() {
     char buf[32];
+    /*rgw_rest_obj rest_obj;
+    rest_obj.init(dest_obj->get_key());
+
+    
+    if (do_decode_rest_obj(cct, attrs, headers, &rest_obj)) {
+      ldout(sc->cct, 0) << "ERROR: failed to decode rest obj out of headers=" << headers << ", attrs=" << attrs << dendl;
+      return set_cr_error(-EINVAL);
+    }
+
+  for (auto header : headers) {
+    const string& val = header.second;
+    if (header.first == "RGWX_OBJECT_SIZE") {
+      info->content_len = atoi(val.c_str());
+    } else {
+      info->attrs[header.first] = val;
+    }
+  }*/
+
+    map<string, string> attrs = headers;
+//	req->get_out_headers(&attrs);
+  //      get_attrs(&attrs);
+
+  for (auto a : attrs) {
+    ldout(cct, 0) << "XXXXXXXXXXXXXX GetCrf attr[" << a.first << "] = " << a.second <<dendl;
+  }
     utime_t ut(obj_properties.mtime);
     snprintf(buf, sizeof(buf), "%lld.%09lld",
         (long long)ut.sec(),
         (long long)ut.nsec());
 
-    string s = rest_obj.attrs["x-amz-meta-rgwx-source-mtime"];
+    string s = attrs["X_AMZ_META_RGWX_SOURCE_MTIME"];
 
+    if (s.empty())
+	 s = attrs["x_amz_meta_rgwx_source_mtime"];
+
+    ldout(cct, 0) << "XXXXXXXXXXXXXX is_already_tiered attrs[X_AMZ_META_RGWX_SOURCE_MTIME] = " << s <<dendl;
+    ldout(cct, 0) << "XXXXXXXXXXXXXX is_already_tiered mtime buf = " << buf <<dendl;
     if (!s.empty() && !strcmp(s.c_str(), buf)){
 	    return 1;
     }
@@ -1085,6 +1166,71 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
     return 0;
   }
 };
+
+int RGWLCCloudCheckCR::operate() {
+    /* Check if object has already been transitioned */
+     rgw_lc_obj_properties obj_properties(tier_ctx.o.meta.mtime,
+        tier_ctx.o.meta.etag,
+        tier_ctx.o.versioned_epoch,
+        tier_ctx.acl_mappings,
+        tier_ctx.target_storage_class);
+
+    rgw_bucket target_bucket;
+    string target_obj_name;
+
+    target_bucket.name = tier_ctx.target_bucket_name;
+    target_obj_name = tier_ctx.obj.key.name; // cross check with aws module
+
+    std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
+    dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));
+
+    std::shared_ptr<rgw::sal::RGWRadosObject> dest_obj;
+    dest_obj.reset(new rgw::sal::RGWRadosObject(tier_ctx.store, rgw_obj_key(target_obj_name), (rgw::sal::RGWRadosBucket *)(dest_bucket.get())));
+
+
+//    std::shared_ptr<RGWStreamReadHTTPResourceCRF> get_crf;
+    std::shared_ptr<RGWLCStreamGetCRF> get_crf;
+    get_crf.reset(new RGWLCStreamGetCRF((CephContext *)(tier_ctx.cct), get_env(), this,
+                  (RGWHTTPManager*)(tier_ctx.http_manager),
+                  obj_properties, tier_ctx.conn, static_cast<rgw::sal::RGWObject *>(dest_obj.get())));
+   int ret;
+
+//   yield {
+    ret = get_crf->init2();
+ //  }
+    if (ret < 0) {
+        ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX get_crf->init failed, ret = " << ret << dendl;
+	return set_cr_error(ret);
+    }
+//reenter(this) {
+  	bl.clear();
+/*	do {
+//	yield {
+    	ret = get_crf->get_headers(&need_retry);
+	if (ret < 0) {
+        	ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX get_crf->read failed, ret = " << ret << dendl;
+		return set_cr_error(ret);
+//	}
+	}
+        if (retcode < 0) {
+          ldout(cct, 20) << __func__ << ": in_crf->read() retcode=" << retcode << dendl;
+          return set_cr_error(ret);
+        }
+	} while (need_retry); */
+
+        if ((static_cast<RGWLCStreamGetCRF *>(get_crf.get()))->is_already_tiered()) {
+	*already_tiered = true;
+        ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX is_already_tiered true" << dendl;
+      return set_cr_done(); 
+    	}
+
+    ldout(tier_ctx.cct, 0) << "XXXXXXXXXXXXXX is_already_tiered false..going with out_crf writing" << dendl;
+
+    return set_cr_done();
+//  } //reenter
+
+  return 0;
+}
 
 map <pair<string, string>, utime_t> target_buckets;
 
