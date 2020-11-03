@@ -1332,6 +1332,7 @@ public:
     RGWObjTier tier_config;
     tier_config.name = oc.tier.storage_class;
     tier_config.tier_placement = oc.tier;
+    tier_config.is_multipart_upload = tier_ctx.is_multipart_upload;
 
     pmanifest->set_tier_type("cloud");
     pmanifest->set_tier_config(tier_config);

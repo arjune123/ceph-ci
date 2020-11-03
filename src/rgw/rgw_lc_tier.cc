@@ -1301,6 +1301,7 @@ int RGWLCCloudTierCR::operate() {
       if (size < multipart_sync_threshold) {
         call (new RGWLCStreamObjToCloudPlainCR(tier_ctx));
       } else {
+        tier_ctx.is_multipart_upload = true;
         call(new RGWLCStreamObjToCloudMultipartCR(tier_ctx));
 
       } 

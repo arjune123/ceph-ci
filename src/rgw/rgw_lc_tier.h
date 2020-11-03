@@ -37,6 +37,8 @@ struct RGWLCCloudTierCtx {
   uint64_t multipart_min_part_size;
   uint64_t multipart_sync_threshold;
 
+  bool is_multipart_upload{false};
+
   RGWLCCloudTierCtx(CephContext* _cct, rgw_bucket_dir_entry& _o,
             rgw::sal::RGWRadosStore* _store, RGWBucketInfo &_binfo, rgw_obj _obj,
             RGWObjectCtx& _rctx, std::shared_ptr<RGWRESTConn> _conn, string _bucket,
