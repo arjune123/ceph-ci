@@ -215,7 +215,7 @@ public:
     }
 
   ret = conn->complete_request(in_req, nullptr, nullptr,
-                               nullptr, nullptr, &headers);
+                               nullptr, nullptr, &headers, null_yield);
   if (ret < 0 && ret != -ENOENT) {
       ldout(cct, 0) << "ERROR: " << __func__ << "(): XXXXXXXXXXXX conn->complete_request() returned ret=" << ret << dendl;
       return ret;
@@ -625,6 +625,9 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
   std::shared_ptr<RGWStreamReadCRF> in_crf;
   std::shared_ptr<RGWStreamWriteHTTPResourceCRF> out_crf;
 
+  std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
+  std::shared_ptr<rgw::sal::RGWRadosObject> dest_obj;
+
   public:
   RGWLCStreamObjToCloudPlainCR(RGWLCCloudTierCtx& _tier_ctx)
     : RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx) {}
@@ -642,11 +645,10 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
     target_bucket.name = tier_ctx.target_bucket_name;
     target_obj_name = tier_ctx.obj.key.name; // cross check with aws module
 
-    std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
     dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));
 
-    std::shared_ptr<rgw::sal::RGWRadosObject> dest_obj;
     dest_obj.reset(new rgw::sal::RGWRadosObject(tier_ctx.store, rgw_obj_key(target_obj_name), (rgw::sal::RGWRadosBucket *)(dest_bucket.get())));
+    rgw::sal::RGWObject *o = static_cast<rgw::sal::RGWObject *>(dest_obj.get());
 
 
     reenter(this) {
@@ -655,7 +657,7 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
 
       out_crf.reset(new RGWLCStreamPutCRF((CephContext *)(tier_ctx.cct), get_env(), this,
             (RGWHTTPManager*)(tier_ctx.http_manager),
-            obj_properties, tier_ctx.conn, static_cast<rgw::sal::RGWObject *>(dest_obj.get())));
+            obj_properties, tier_ctx.conn, o));
 
       /* actual Read & Write */
       yield call(new RGWStreamWriteCR(cct, (RGWHTTPManager*)(tier_ctx.http_manager), in_crf, out_crf));
@@ -681,6 +683,9 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
   std::shared_ptr<RGWStreamReadCRF> in_crf;
   std::shared_ptr<RGWStreamWriteHTTPResourceCRF> out_crf;
 
+  std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
+  std::shared_ptr<rgw::sal::RGWRadosObject> dest_obj;
+
   public:
   RGWLCStreamObjToCloudMultipartPartCR(RGWLCCloudTierCtx& _tier_ctx,
       const string& _upload_id,
@@ -704,10 +709,8 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
     target_bucket.name = tier_ctx.target_bucket_name;
     target_obj_name = tier_ctx.obj.key.name; // cross check with aws module
 
-    std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
     dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));
 
-    std::shared_ptr<rgw::sal::RGWRadosObject> dest_obj;
     dest_obj.reset(new rgw::sal::RGWRadosObject(tier_ctx.store, rgw_obj_key(target_obj_name), (rgw::sal::RGWRadosBucket *)(dest_bucket.get())));
 
     reenter(this) {
@@ -1252,23 +1255,27 @@ int RGWLCCloudTierCR::operate() {
 
     if (!bucket_created){
       yield {
-        ldout(tier_ctx.cct,0) << "Cloud_tier_ctx: creating bucket " << tier_ctx.target_bucket_name << dendl;
+        ldout(tier_ctx.cct,0) << "Cloud_tier_ctx: creating bucket:" << tier_ctx.target_bucket_name << dendl;
         bufferlist bl;
         call(new RGWPutRawRESTResourceCR <bufferlist> (tier_ctx.cct, tier_ctx.conn.get(),
             tier_ctx.http_manager,
             tier_ctx.target_bucket_name, nullptr, bl, &out_bl));
       }
       if (retcode < 0 ) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to create target bucket: " << tier_ctx.target_bucket_name << dendl;
+        return set_cr_error(retcode);
+      }
+      if (out_bl.length() > 0) {
         RGWXMLDecoder::XMLParser parser;
         if (!parser.init()) {
           ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize xml parser for parsing create_bucket response from server" << dendl;
-          return set_cr_error(retcode);
+          return set_cr_error(-EIO);
         }
 
         if (!parser.parse(out_bl.c_str(), out_bl.length(), 1)) {
           string str(out_bl.c_str(), out_bl.length());
           ldout(tier_ctx.cct, 5) << "ERROR: failed to parse xml: " << str << dendl;
-          return set_cr_error(retcode);
+          return set_cr_error(-EIO);
         }
 
         try {
@@ -1276,11 +1283,12 @@ int RGWLCCloudTierCR::operate() {
         } catch (RGWXMLDecoder::err& err) {
           string str(out_bl.c_str(), out_bl.length());
           ldout(tier_ctx.cct, 5) << "ERROR: unexpected xml: " << str << dendl;
-          return set_cr_error(retcode);
+          return set_cr_error(-EIO);
         }
 
         if (result.code != "BucketAlreadyOwnedByYou") {
-          return set_cr_error(retcode);
+          ldout(tier_ctx.cct, 0) << "ERROR: Creating target bucket failed with error: " << result.code << dendl;
+          return set_cr_error(-EIO);
         }
       }
 
