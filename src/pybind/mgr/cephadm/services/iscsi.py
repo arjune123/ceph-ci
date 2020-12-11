@@ -90,12 +90,14 @@ class IscsiService(CephService):
                 host = self._inventory_get_addr(dd.hostname)
                 service_url = 'http://{}:{}@{}:{}'.format(
                     spec.api_user, spec.api_password, host, spec.api_port or '5000')
+                safe_service_url = 'http://{}:{}@{}:{}'.format(
+                    '****', '****', host, spec.api_port or '5000')
                 gw = gateways.get(host)
                 if not gw or gw['service_url'] != service_url:
-                    logger.info('Adding iSCSI gateway %s to Dashboard', service_url)
+                    logger.info('Adding iSCSI gateway %s to Dashboard', safe_service_url)
                     cmd_dicts.append({
                         'prefix': 'dashboard iscsi-gateway-add',
-                        'service_url': service_url,
+                        'inbuf': service_url,
                         'name': host
                     })
             return cmd_dicts
