@@ -20,6 +20,8 @@ if test $(id -u) != 0 ; then
     SUDO=sudo
 fi
 export LC_ALL=C # the following is vulnerable to i18n
+#add this to ceph-build or remove all temporary mangling
+export WITH_JAEGER=true
 
 ARCH=$(uname -m)
 
@@ -29,6 +31,8 @@ function munge_ceph_spec_in {
     local with_zbd=$1
     shift
     local for_make_check=$1
+    shift
+    local with_jaeger=$1
     shift
     local OUTFILE=$1
     sed -e 's/@//g' < ceph.spec.in > $OUTFILE
@@ -54,6 +58,8 @@ function munge_debian_control {
     shift
     local for_make_check=$1
     shift
+    local with_jaeger=$1
+    shift
     local control=$1
     case "$version" in
         *squeeze*|*wheezy*)
@@ -70,6 +76,11 @@ function munge_debian_control {
     fi
     if $for_make_check; then
         sed -i 's/^# Make-Check[[:space:]]/             /g' $control
+    fi
+    if $with_jaeger; then
+      sed -i -e 's/^# Jaeger[[:space:]]\+/               /g' $control
+      sed -i -e '/^# Crimson[[:space:]]\+libyaml-cpp-dev,/d' $control
+      sed -i -e 's/^[[:space:]]\+Built-Using:/Built-Using:/' $control
     fi
     echo $control
 }
@@ -344,7 +355,7 @@ else
         touch $DIR/status
 
 	backports=""
-	control=$(munge_debian_control "$VERSION" "$with_seastar" "$for_make_check" "debian/control")
+	control=$(munge_debian_control "$VERSION" "$with_seastar" "$for_make_check" "$with_jaeger" "debian/control")
         case "$VERSION" in
             *squeeze*|*wheezy*)
                 backports="-t $codename-backports"
@@ -385,7 +396,7 @@ else
                 fi
                 ;;
         esac
-        munge_ceph_spec_in $with_seastar $with_zbd $for_make_check $DIR/ceph.spec
+        munge_ceph_spec_in $with_seastar $with_zbd $for_make_check $with_jaeger $DIR/ceph.spec
         # for python3_pkgversion macro defined by python-srpm-macros, which is required by python3-devel
         $SUDO dnf install -y python3-devel
         $SUDO $builddepcmd $DIR/ceph.spec 2>&1 | tee $DIR/yum-builddep.out
@@ -397,7 +408,7 @@ else
         echo "Using zypper to install dependencies"
         zypp_install="zypper --gpg-auto-import-keys --non-interactive install --no-recommends"
         $SUDO $zypp_install systemd-rpm-macros rpm-build || exit 1
-        munge_ceph_spec_in $with_seastar false $for_make_check $DIR/ceph.spec
+        munge_ceph_spec_in $with_seastar false $for_make_check $with_jaeger $DIR/ceph.spec
         $SUDO $zypp_install $(rpmspec -q --buildrequires $DIR/ceph.spec) || exit 1
         ;;
     *)
