@@ -1381,9 +1381,12 @@ public:
     RGWAccessKey key = oc.tier.key;
     HostStyle host_style = oc.tier.host_style;
     string bucket_name = oc.tier.target_path;
+    const RGWZoneGroup& zonegroup = oc.store->svc()->zone->get_zonegroup();
    
     if (bucket_name.empty()) {
-      bucket_name = "cloud-bucket";
+      bucket_name = "rgwx-" + zonegroup.get_name() + "-" + oc.tier.storage_class +
+                    "-cloud-bucket";
+      boost::algorithm::to_lower(bucket_name);
     }
 
     conn.reset(new S3RESTConn(oc.cct, oc.store->svc()->zone,
@@ -1454,6 +1457,7 @@ public:
     target_placement.inherit_from(oc.bucket->get_placement_rule());
     target_placement.storage_class = transition.storage_class;
 
+    ldpp_dout(oc.dpp, 0) << "XXXXXXXXXXX ERROR: in lifecycle::process" <<  dendl;
     r = get_tier_target(zonegroup, target_placement, target_placement.storage_class, oc.tier);
 
     if (!r && oc.tier.tier_type == "cloud") {
