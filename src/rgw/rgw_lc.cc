@@ -1403,7 +1403,7 @@ public:
     }
 
     RGWLCCloudTierCtx tier_ctx(oc.cct, oc.o, oc.store, oc.bucket_info,
-                        oc.obj, oc.rctx, conn, bucket_name, oc.tier.tier_storage_class,
+                        oc.obj, oc.rctx, conn, bucket_name, oc.tier.target_storage_class,
                         &http_manager);
     tier_ctx.acl_mappings = oc.tier.acl_mappings;
     tier_ctx.multipart_min_part_size = oc.tier.multipart_min_part_size;
