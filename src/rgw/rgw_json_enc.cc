@@ -1488,7 +1488,9 @@ void RGWZoneGroupPlacementTarget::dump(Formatter *f) const
   encode_json("name", name, f);
   encode_json("tags", tags, f);
   encode_json("storage_classes", storage_classes, f);
-  encode_json("tier_targets", tier_targets, f);
+  if (!tier_targets.empty()) {
+    encode_json("tier_targets", tier_targets, f);
+  }
 }
 
 void RGWZoneGroupPlacementTarget::decode_json(JSONObj *obj)
@@ -1499,7 +1501,9 @@ void RGWZoneGroupPlacementTarget::decode_json(JSONObj *obj)
   if (storage_classes.empty()) {
     storage_classes.insert(RGW_STORAGE_CLASS_STANDARD);
   }
-  JSONDecoder::decode_json("tier_targets", tier_targets, obj);
+  if (!tier_targets.empty()) {
+    JSONDecoder::decode_json("tier_targets", tier_targets, obj);
+  }
 }
 
 void RGWZoneGroup::dump(Formatter *f) const
