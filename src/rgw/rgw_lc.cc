@@ -1249,32 +1249,65 @@ public:
     return need_to_process;
   }
 
+ /* find out if the the storage class is remote cloud */
+ int get_tier_target(const RGWZoneGroup &zonegroup, rgw_placement_rule rule,
+         string storage_class, RGWZoneGroupPlacementTier &tier) {
+   std::map<std::string, RGWZoneGroupPlacementTarget>::const_iterator titer;
+   titer = zonegroup.placement_targets.find(rule.name);
+   if (titer == zonegroup.placement_targets.end()) {
+     return -1;
+   }
+
+   if (storage_class.empty()) {
+       storage_class = rule.storage_class;
+   }
+
+   const auto& target_rule = titer->second;
+   std::map<std::string, RGWZoneGroupPlacementTier>::const_iterator ttier;
+   ttier = target_rule.tier_targets.find(storage_class);
+   if (ttier != target_rule.tier_targets.end()) {
+       tier = ttier->second;
+   }
+
+   return 0;
+ }
+
   int process(lc_op_ctx& oc) {
     auto& o = oc.o;
+    int r;
+    std::string tier_type = ""; 
+    const RGWZoneGroup& zonegroup = oc.store->svc()->zone->get_zonegroup();
+    RGWZoneGroupPlacementTier tier = {};
 
     rgw_placement_rule target_placement;
     target_placement.inherit_from(oc.bucket->get_placement_rule());
     target_placement.storage_class = transition.storage_class;
 
-    if (!oc.store->get_zone()->get_params().
-	valid_placement(target_placement)) {
-      ldpp_dout(oc.dpp, 0) << "ERROR: non existent dest placement: "
-			   << target_placement
-                           << " bucket="<< oc.bucket
-                           << " rule_id=" << oc.op.id
-			   << " " << oc.wq->thr_name() << dendl;
-      return -EINVAL;
-    }
+    r = get_tier_target(zonegroup, target_placement, target_placement.storage_class, tier);
 
-    int r = oc.obj->transition(oc.rctx, oc.bucket, target_placement, o.meta.mtime,
-			       o.versioned_epoch, oc.dpp, null_yield);
-    if (r < 0) {
-      ldpp_dout(oc.dpp, 0) << "ERROR: failed to transition obj " 
-			   << oc.bucket << ":" << o.key
-			   << " -> " << transition.storage_class 
-			   << " " << cpp_strerror(r)
-			   << " " << oc.wq->thr_name() << dendl;
-      return r;
+    if (tier.tier_type == "cloud") {
+         ldpp_dout(oc.dpp, 0) << "Found cloud tier: " << target_placement.storage_class << dendl;
+    } else {
+      if (!oc.store->get_zone()->get_params().
+  	    valid_placement(target_placement)) {
+        ldpp_dout(oc.dpp, 0) << "ERROR: non existent dest placement: "
+	  		     << target_placement
+                             << " bucket="<< oc.bucket
+                             << " rule_id=" << oc.op.id
+			     << " " << oc.wq->thr_name() << dendl;
+        return -EINVAL;
+      }
+
+      int r = oc.obj->transition(oc.rctx, oc.bucket, target_placement, o.meta.mtime,
+	  		         o.versioned_epoch, oc.dpp, null_yield);
+      if (r < 0) {
+        ldpp_dout(oc.dpp, 0) << "ERROR: failed to transition obj " 
+			     << oc.bucket << ":" << o.key 
+			     << " -> " << transition.storage_class 
+			     << " " << cpp_strerror(r)
+			     << " " << oc.wq->thr_name() << dendl;
+        return r;
+      }
     }
     ldpp_dout(oc.dpp, 2) << "TRANSITIONED:" << oc.bucket
 			 << ":" << o.key << " -> "
