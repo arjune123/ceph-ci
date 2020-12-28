@@ -533,6 +533,8 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
 
 
     reenter(this) {
+    //  tier_ctx.obj.set_atomic(&tier_ctx.rctx); -- might need when updated to zipper SAL
+
       /* Prepare Read from source */
       in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.store->getRados(), tier_ctx.bucket_info,
                    tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
@@ -590,6 +592,8 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
                    (rgw::sal::RGWRadosBucket *)(dest_bucket.get())));
 
     reenter(this) {
+    //  tier_ctx.obj.set_atomic(&tier_ctx.rctx); -- might need when updated to zipper SAL
+
       /* Prepare Read from source */
       in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.store->getRados(),
                    tier_ctx.bucket_info, tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
