@@ -6,8 +6,7 @@ This feature enables data transition to a remote cloud service as part of `Lifec
 
 Special storage class of tier type cloud is used to configure the remote cloud object store service to which the data needs to be transitioned to. These are defined in terms of zonegroup placement targets and unlike regular storage classes, do not need a data pool. Any additions or modifications need period commit to get reflected.
 
-User credentials for the remote cloud object store service need to be configured. Since many cloud services impose limits
-on the number of buckets that each user can create, the mapping of source objects and buckets is configurable. Note that source ACLs will not
+User credentials for the remote cloud object store service need to be configured. Note that source ACLs will not
 be preserved. It is possible to map permissions of specific source users to specific destination users.
 
 
@@ -76,7 +75,7 @@ ID of user in the destination.
 * ``target_path`` (string)
 
 A string that defines how the target path is created. The target path specifies a prefix to which
-the source object name is appended. If not specified the target_path created is "rgwx-${zonegroup}-${storage-class}-cloud-bucket".
+the source 'bucket-name/object-name' is appended. If not specified the target_path created is "rgwx-${zonegroup}-${storage-class}-cloud-bucket".
 
 For example: ``target_path = rgwx-archive-${zonegroup}/``
 
@@ -115,9 +114,9 @@ Minimum parts size to use when transitioning objects using multipart upload.
 How to Configure
 ~~~~~~~~~~~~~~~~
 
-See `Adding a Storage Class <https://docs.ceph.com/en/latest/radosgw/placement/#adding-a-storage-class>`__ for how to configure storage-class for a zonegroup. The cloud transition requires a creation of a special storage class with tier type defined as ``cloud``:
+See `Adding a Storage Class <https://docs.ceph.com/en/latest/radosgw/placement/#adding-a-storage-class>`__ for how to configure storage-class for a zonegroup. The cloud transition requires a creation of a special storage class with tier type defined as ``cloud``
 
-Note: Once a storage class is created of -tier-type=cloud, it cannot be later modified to any other storage class type.
+Note: Once a storage class is created of ``-tier-type=cloud``, it cannot be later modified to any other storage class type.
 
 ::
 
@@ -312,9 +311,13 @@ For example,
     ERROR: S3 error: 403 (InvalidObjectState)
 
 
+Since all the objects are transitioned to a single target bucket, bucket versioning is not enabled on the remote endpoint. That means multiple versions of the same object (if any) shall get overwritten based on the order of their transition.
+
 Future Work
 -----------
 
 * Support s3:RestoreObject operation on cloud transitioned objects.
 
 * Federation between RGW and Cloud services.
+
+* Support Object versioning for the transitioned objects
