@@ -26,6 +26,15 @@
 
 using namespace std;
 
+static string get_key_instance(const rgw_obj_key& key)
+{
+  if (!key.instance.empty() &&
+      !key.have_null_instance()) {
+    return "-" + key.instance;
+  }
+  return "";
+}
+
 static string get_key_oid(const rgw_obj_key& key)
 {
   string oid = key.name;
@@ -524,7 +533,7 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
 
     target_bucket.name = tier_ctx.target_bucket_name;
     target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
-                      tier_ctx.obj.key.name;
+                      tier_ctx.obj.key.name + get_key_instance(tier_ctx.obj.key);
 
     dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));
 
@@ -586,7 +595,7 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
 
     target_bucket.name = tier_ctx.target_bucket_name;
     target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
-                      tier_ctx.obj.key.name;
+                      tier_ctx.obj.key.name + get_key_instance(tier_ctx.obj.key);
 
     dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));
 
@@ -931,7 +940,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
 
     string target_obj_name;
     target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
-                      tier_ctx.obj.key.name;
+                      tier_ctx.obj.key.name + get_key_instance(tier_ctx.obj.key);
     rgw_obj dest_obj(target_bucket, target_obj_name);
     std::shared_ptr<RGWStreamReadCRF> in_crf;
     rgw_rest_obj rest_obj;
@@ -1051,7 +1060,7 @@ int RGWLCCloudCheckCR::operate() {
 
   target_bucket.name = tier_ctx.target_bucket_name;
   target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
-                    tier_ctx.obj.key.name;
+                    tier_ctx.obj.key.name + get_key_instance(tier_ctx.obj.key);
 
   std::shared_ptr<rgw::sal::RGWRadosBucket> dest_bucket;
   dest_bucket.reset(new rgw::sal::RGWRadosBucket(tier_ctx.store, target_bucket));

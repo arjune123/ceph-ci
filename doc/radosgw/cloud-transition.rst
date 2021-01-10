@@ -277,6 +277,13 @@ The cloud storage class once configured can then be used like any other storage 
 
 Since the transition is unidirectional, while configuring S3 lifecycle rules, the cloud storage class should be specified last among all the storage classes the object transitions to. Subsequent rules (if any) do not apply post transition to the cloud.
 
+To avoid object names collision across various buckets, source bucket name is prepended to the target object name. If the object is versioned, object versionid is appended to the end.
+
+Below is the sample object name format:
+::
+
+    s3://<target_path>/<source_bucket_name>/<source_object_name>(:<source_object_version_id>)
+
 Due to API limitations there is no way to preserve original object modification time and ETag but they get stored as metadata attributes on the destination objects, as shown below:
 
 ::
@@ -286,7 +293,6 @@ Due to API limitations there is no way to preserve original object modification 
    x-amz-meta-rgwx-source-key: lc.txt
    x-amz-meta-rgwx-source-mtime: 1608546349.757100363
    x-amz-meta-rgwx-versioned-epoch: 0
-
 
 By default, post transition, the source object gets deleted. But it is possible to retain its metadata but with updated values (like storage-class and object-size) by setting config option 'retain_object' to true. However GET on those objects shall still fail with 'InvalidObjectState' error.
 
@@ -311,13 +317,9 @@ For example,
     ERROR: S3 error: 403 (InvalidObjectState)
 
 
-Since all the objects are transitioned to a single target bucket, bucket versioning is not enabled on the remote endpoint. That means multiple versions of the same object (if any) shall get overwritten based on the order of their transition.
-
 Future Work
 -----------
 
 * Support s3:RestoreObject operation on cloud transitioned objects.
 
 * Federation between RGW and Cloud services.
-
-* Support Object versioning for the transitioned objects
