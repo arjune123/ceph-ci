@@ -187,6 +187,7 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
 class RGWLCStreamReadCRF : public RGWStreamReadCRF
 {
   CephContext *cct;
+  const DoutPrefixProvider *dpp;
   map<string, bufferlist> attrs;
   uint64_t obj_size;
   rgw_obj& obj;
@@ -198,10 +199,11 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
   off_t m_part_end;
 
   public:
-  RGWLCStreamReadCRF(CephContext *_cct, RGWRados* rados, RGWBucketInfo& bucket_info,
+  RGWLCStreamReadCRF(CephContext *_cct, const DoutPrefixProvider *_dpp,
+                     RGWRados* rados, RGWBucketInfo& bucket_info,
                      RGWObjectCtx& obj_ctx, rgw_obj& _obj, const real_time &_mtime) :
                      RGWStreamReadCRF(rados, bucket_info, obj_ctx, _obj), cct(_cct),
-                     obj(_obj), mtime(_mtime) {}
+                     dpp(_dpp), obj(_obj), mtime(_mtime) {}
 
   ~RGWLCStreamReadCRF() {};
 
@@ -220,7 +222,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
     read_op.params.lastmod = &read_mtime;
     read_op.params.obj_size = &obj_size;
 
-    int ret = read_op.prepare(y);
+    int ret = read_op.prepare(y, dpp);
     if (ret < 0) {
       ldout(cct, 0) << "ERROR: fail to prepare read_op, ret = " << ret << dendl;
       return ret;
@@ -288,7 +290,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
   int read(off_t ofs, off_t end, bufferlist &bl) {
     optional_yield y = null_yield;
 
-    return read_op.read(ofs, end, bl, y);
+    return read_op.read(ofs, end, bl, y, dpp);
   }
 };
 
@@ -546,7 +548,8 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
     //  tier_ctx.obj.set_atomic(&tier_ctx.rctx); -- might need when updated to zipper SAL
 
       /* Prepare Read from source */
-      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.store->getRados(), tier_ctx.bucket_info,
+      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.dpp,
+                   tier_ctx.store->getRados(), tier_ctx.bucket_info,
                    tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
 
       out_crf.reset(new RGWLCStreamPutCRF((CephContext *)(tier_ctx.cct), get_env(), this,
@@ -606,7 +609,7 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
     //  tier_ctx.obj.set_atomic(&tier_ctx.rctx); -- might need when updated to zipper SAL
 
       /* Prepare Read from source */
-      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.store->getRados(),
+      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.dpp, tier_ctx.store->getRados(),
                    tier_ctx.bucket_info, tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
 
       end = part_info.ofs + part_info.size - 1;
@@ -967,7 +970,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
       }
 
       if (retcode == -ENOENT) {
-        in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.store->getRados(), tier_ctx.bucket_info, tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
+        in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.dpp, tier_ctx.store->getRados(), tier_ctx.bucket_info, tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
 
         in_crf->init();
 

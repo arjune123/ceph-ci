@@ -116,7 +116,7 @@ How to Configure
 
 See `Adding a Storage Class <https://docs.ceph.com/en/latest/radosgw/placement/#adding-a-storage-class>`__ for how to configure storage-class for a zonegroup. The cloud transition requires a creation of a special storage class with tier type defined as ``cloud``
 
-Note: Once a storage class is created of ``-tier-type=cloud``, it cannot be later modified to any other storage class type.
+Note: Once a storage class is created of ``--tier-type=cloud``, it cannot be later modified to any other storage class type.
 
 ::
 
@@ -319,6 +319,8 @@ For example,
 
 Future Work
 -----------
+
+* Send presigned redirect or read-through the objects transitioned to cloud
 
 * Support s3:RestoreObject operation on cloud transitioned objects.
 
