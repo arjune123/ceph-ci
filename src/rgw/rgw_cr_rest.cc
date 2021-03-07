@@ -347,9 +347,7 @@ int RGWStreamSpliceCR::operate(const DoutPrefixProvider *dpp) {
   return 0;
 }
 
-RGWStreamReadCRF::RGWStreamReadCRF(RGWRados* rados, RGWBucketInfo& bucket_info,
-                  RGWObjectCtx& obj_ctx, rgw_obj& obj) :
-      op_target(rados, bucket_info, obj_ctx, obj), read_op(&op_target) {}
+RGWStreamReadCRF::RGWStreamReadCRF(RGWObjectCtx& obj_ctx) : read_op(&obj_ctx) {}
 RGWStreamReadCRF::~RGWStreamReadCRF() {}
 
 RGWStreamWriteCR::RGWStreamWriteCR(CephContext *_cct, RGWHTTPManager *_mgr,
