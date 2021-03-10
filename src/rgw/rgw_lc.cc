@@ -1276,10 +1276,10 @@ public:
   int delete_tier_obj(lc_op_ctx& oc, RGWLCCloudTierCtx& tier_ctx) {
     int ret = 0;
 
-    /* XXX: do we need to check for bucket versioning and create delete_marker
-     * if current version?
+    /* If bucket is versioned, create delete_marker for current version
      */
-    ret = remove_expired_obj(oc.dpp, oc ,true);
+    ret = remove_expired_obj(oc.dpp, oc,
+                 !(oc.o.is_current() && oc.bucket->versioned()));
     return ret;
   }
 
@@ -1309,7 +1309,6 @@ public:
     
     RGWObjState *s = tier_ctx.rctx.get_state((*tier_ctx.obj)->get_obj());
     std::unique_ptr<rgw::sal::RGWObject::WriteOp> obj_op(oc.obj->get_write_op(&oc.rctx));
-
 
     obj_op->params.modify_tail = true;
     obj_op->params.flags = PUT_OBJ_CREATE;
@@ -1383,7 +1382,12 @@ public:
     HostStyle host_style = oc.tier.t.s3.host_style;
     string bucket_name = oc.tier.t.s3.target_path;
     const RGWZoneGroup& zonegroup = oc.store->get_zone()->get_zonegroup();
+    bool delete_object;
    
+    /* Option 'retain_object' is not applicable for CurrentVersionTransition */
+    delete_object = (!oc.tier.retain_object ||
+                     (oc.o.is_current() && oc.bucket->versioned()));
+
     if (bucket_name.empty()) {
       bucket_name = "rgwx-" + zonegroup.get_name() + "-" + oc.tier.storage_class +
                     "-cloud-bucket";
@@ -1435,16 +1439,16 @@ public:
       return ret;
     }
 
-    if (oc.tier.retain_object) {
-      ret = update_tier_obj(oc, tier_ctx);
-      if (ret < 0) {
-        ldpp_dout(oc.dpp, 0) << "ERROR: Updating tier object failed ret=" << ret << dendl;
-        return ret;
-      }
-    } else {
+    if (delete_object) {
       ret = delete_tier_obj(oc, tier_ctx);
       if (ret < 0) {
         ldpp_dout(oc.dpp, 0) << "ERROR: Deleting tier object failed ret=" << ret << dendl;
+        return ret;
+      }
+    } else {
+      ret = update_tier_obj(oc, tier_ctx);
+      if (ret < 0) {
+        ldpp_dout(oc.dpp, 0) << "ERROR: Updating tier object failed ret=" << ret << dendl;
         return ret;
       }
     }
@@ -1466,10 +1470,13 @@ public:
 
     if (!r && oc.tier.tier_type == "cloud-s3") {
       ldpp_dout(oc.dpp, 20) << "Found cloud s3 tier: " << target_placement.storage_class << dendl;
-      if (!pass_object_lock_check(oc.store, oc.obj.get(), oc.rctx, oc.dpp)) {
+
+      if (!oc.o.is_current() &&
+          !pass_object_lock_check(oc.store, oc.obj.get(), oc.rctx, oc.dpp)) {
         /* Skip objects which has object lock enabled. */
-        ldpp_dout(oc.dpp, 10) << "Object(key:" << o.key << ") is locked Skipping transition to cloud-s3 tier: " << target_placement.storage_class << dendl;
+        ldpp_dout(oc.dpp, 10) << "Object(key:" << oc.o.key << ") is locked Skipping transition to cloud-s3 tier: " << target_placement.storage_class << dendl;
       }
+
       r = transition_obj_to_cloud(oc);
       if (r < 0) {
         ldpp_dout(oc.dpp, 0) << "ERROR: failed to transition obj to cloud (r=" << r << ")"

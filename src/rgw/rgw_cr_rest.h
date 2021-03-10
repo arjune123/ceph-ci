@@ -596,8 +596,9 @@ public:
   off_t ofs;
   off_t end;
   rgw_rest_obj rest_obj;
+  std::unique_ptr<rgw::sal::RGWObject>* obj;
 
-  RGWStreamReadCRF(RGWObjectCtx& obj_ctx);
+  RGWStreamReadCRF(std::unique_ptr<rgw::sal::RGWObject>* obj, RGWObjectCtx& obj_ctx);
   virtual ~RGWStreamReadCRF();
 
   virtual int init() {return 0; }

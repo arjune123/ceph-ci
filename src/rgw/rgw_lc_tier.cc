@@ -202,7 +202,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
   RGWLCStreamReadCRF(CephContext *_cct, const DoutPrefixProvider *_dpp,
                      RGWObjectCtx& obj_ctx, std::unique_ptr<rgw::sal::RGWObject>* _obj,
                      const real_time &_mtime) :
-                     RGWStreamReadCRF(obj_ctx), cct(_cct),
+                     RGWStreamReadCRF(_obj, obj_ctx), cct(_cct),
                      dpp(_dpp), obj(_obj), mtime(_mtime) {}
 
   ~RGWLCStreamReadCRF() {};
@@ -874,6 +874,7 @@ class RGWLCStreamAbortMultipartUploadCR : public RGWCoroutine {
   const rgw_raw_obj status_obj;
 
   string upload_id;
+  int ret = -1;
 
   public:
 
@@ -890,9 +891,10 @@ class RGWLCStreamAbortMultipartUploadCR : public RGWCoroutine {
         ldout(tier_ctx.cct, 0) << "ERROR: failed to abort multipart upload dest obj=" << dest_obj << " upload_id=" << upload_id << " retcode=" << retcode << dendl;
         /* ignore error, best effort */
       }
-      yield call(new RGWRadosRemoveCR(tier_ctx.store, status_obj));
-      if (retcode < 0) {
-        ldout(tier_ctx.cct, 0) << "ERROR: failed to remove sync status obj obj=" << status_obj << " retcode=" << retcode << dendl;
+      ret = tier_ctx.store->delete_system_obj(status_obj.pool, status_obj.oid, nullptr, null_yield);
+
+      if (ret < 0) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to remove sync status obj obj=" << status_obj << " retcode=" << ret << dendl;
         /* ignore error, best effort */
       }
       return set_cr_done();
@@ -921,6 +923,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
   int ret_err{0};
 
   rgw_raw_obj status_obj;
+  bufferlist bl;
 
   public:
   RGWLCStreamObjToCloudMultipartCR(RGWLCCloudTierCtx& _tier_ctx) : RGWCoroutine(_tier_ctx.cct),  tier_ctx(_tier_ctx) {}
@@ -948,16 +951,26 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
     status_obj = rgw_raw_obj(tier_ctx.store->get_zone()->get_params().log_pool,
         "lc_multipart_" + (*tier_ctx.obj)->get_oid());
 
-    reenter(this) {
-      yield call(new RGWSimpleRadosReadCR<rgw_lc_multipart_upload_info>(tier_ctx.store->svc()->rados->get_async_processor(), tier_ctx.store->svc()->sysobj,
-            status_obj, &status, false));
+      ret_err = tier_ctx.store->get_system_obj(tier_ctx.dpp, status_obj.pool,
+                  status_obj.oid, bl, NULL, NULL, null_yield);
 
-      if (retcode < 0 && retcode != -ENOENT) {
-        ldout(tier_ctx.cct, 0) << "ERROR: failed to read sync status of object " << src_obj << " retcode=" << retcode << dendl;
+      if (ret_err < 0 && ret_err != -ENOENT) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to read sync status of object " << src_obj << " retcode=" << ret_err << dendl;
         return retcode;
       }
 
-      if (retcode >= 0) {
+      if (ret_err >= 0) {
+        auto iter = bl.cbegin();
+        try {
+          decode(status, iter);
+        } catch (buffer::error& err) {
+          return -EIO;
+        }
+      }
+
+    reenter(this) {
+
+      if (ret_err >= 0) {
         /* check here that mtime and size did not change */
         if (status.mtime != obj_properties.mtime || status.obj_size != obj_size ||
             status.etag != obj_properties.etag) {
@@ -966,7 +979,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
         }
       }
 
-      if (retcode == -ENOENT) {
+      if (ret_err == -ENOENT) {
         in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.dpp, tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
 
         in_crf->init();
@@ -1021,9 +1034,11 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
           return set_cr_error(ret_err);
         }
 
-        yield call(new RGWSimpleRadosWriteCR<rgw_lc_multipart_upload_info>(tier_ctx.store->svc()->rados->get_async_processor(), tier_ctx.store->svc()->sysobj, status_obj, status));
-        if (retcode < 0) {
-          ldout(tier_ctx.cct, 0) << "ERROR: failed to store multipart upload state, retcode=" << retcode << dendl;
+        encode(status, bl);
+        ret_err = tier_ctx.store->put_system_obj(status_obj.pool, status_obj.oid,
+                      bl, false, NULL, real_time(), null_yield, NULL);
+        if (ret_err < 0) {
+          ldout(tier_ctx.cct, 0) << "ERROR: failed to store multipart upload state, retcode=" << ret_err << dendl;
           /* continue with upload anyway */
         }
         ldout(tier_ctx.cct, 0) << "sync of object=" << tier_ctx.obj << " via multipart upload, finished sending part #" << status.cur_part << " etag=" << pcur_part_info->etag << dendl;
@@ -1038,9 +1053,10 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
       }
 
       /* remove status obj */
-      yield call(new RGWRadosRemoveCR(tier_ctx.store, status_obj));
-      if (retcode < 0) {
-        ldout(tier_ctx.cct, 0) << "ERROR: failed to abort multipart upload obj=" << tier_ctx.obj << " upload_id=" << status.upload_id << " part number " << status.cur_part << " (" << cpp_strerror(-retcode) << ")" << dendl;
+      ret_err = tier_ctx.store->delete_system_obj(status_obj.pool, status_obj.oid, nullptr, null_yield);
+
+      if (ret_err < 0) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to abort multipart upload obj=" << tier_ctx.obj << " upload_id=" << status.upload_id << " part number " << status.cur_part << " (" << cpp_strerror(-ret_err) << ")" << dendl;
         /* ignore error, best effort */
       }
       return set_cr_done();
