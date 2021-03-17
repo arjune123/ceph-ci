@@ -1391,8 +1391,8 @@ public:
     const RGWZoneGroup& zonegroup = oc.store->get_zone()->get_zonegroup();
     bool delete_object;
    
-    /* Option 'retain_object' is not applicable for CurrentVersionTransition */
-    delete_object = (!oc.tier.retain_object ||
+    /* Option 'retain_head_object' is not applicable for CurrentVersionTransition */
+    delete_object = (!oc.tier.retain_head_object ||
                      (oc.o.is_current() && oc.bucket->versioned()));
 
     if (bucket_name.empty()) {

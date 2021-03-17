@@ -27,7 +27,7 @@ Cloud Storage Class Configuration
       "target_storage_class": <target-storage-class>,
       "multipart_sync_threshold": {object_size},
       "multipart_min_part_size": {part_size},
-      "retain_object": <true | false>
+      "retain_head_object": <true | false>
     }
 
 
@@ -83,7 +83,7 @@ For example: ``target_path = rgwx-archive-${zonegroup}/``
 
 A string that defines the target storage class to which the object transitions to. If not specified, object is transitioned to STANDARD storage class.
 
-* ``retain_object`` (true | false)
+* ``retain_head_object`` (true | false)
 
 If true, retains the metadata of the object transitioned to cloud. If false (default), the object is deleted post transition.
 This option is ignored for current versioned objects. For more details, refer to section "Versioned Objects" below.
@@ -149,7 +149,7 @@ For example:
                         "val": {
                             "tier_type": "cloud-s3",
                             "storage_class": "CLOUDTIER",
-                            "retain_object": "false",
+                            "retain_head_object": "false",
                             "s3": {
                                 "endpoint": "",
                                 "access_key": "",
@@ -193,7 +193,7 @@ For example:
                                                access_key=<access_key>,secret=<secret>, \
                                                multipart_sync_threshold=44432, \
                                                multipart_min_part_size=44432, \
-                                               retain_object=true
+                                               retain_head_object=true
 
 Nested values can be accessed using period. For example:
 
@@ -290,7 +290,7 @@ Due to API limitations there is no way to preserve original object modification 
    x-amz-meta-rgwx-source-mtime: 1608546349.757100363
    x-amz-meta-rgwx-versioned-epoch: 0
 
-By default, post transition, the source object gets deleted. But it is possible to retain its metadata but with updated values (like storage-class and object-size) by setting config option 'retain_object' to true. However GET on those objects shall still fail with 'InvalidObjectState' error.
+By default, post transition, the source object gets deleted. But it is possible to retain its metadata but with updated values (like storage-class and object-size) by setting config option 'retain_head_object' to true. However GET on those objects shall still fail with 'InvalidObjectState' error.
 
 For example,
 ::
@@ -321,16 +321,21 @@ Below is the sample object name format:
 
 
 Versioned Objects
-"""""""""""""""""
-For versioned and locked objects, similar semantics as that of LifecycleExpiration are applied as stated below -
+~~~~~~~~~~~~~~~~~
+
+For versioned and locked objects, similar semantics as that of LifecycleExpiration are applied as stated below.
 
 If the bucket versioning is enabled and the object transitioned to cloud is
- - current version, irrespective of what the config option "retain_object" value is, the object is not deleted but instead delete marker is created on the source rgw server.
- - noncurrent version, it is deleted or retained based on the config option "retain_object" value.
+
+* current version - irrespective of what the config option "retain_head_object" value is, the object is not deleted but instead delete marker is created on the source rgw server.
+
+* noncurrent version - it is deleted or retained based on the config option "retain_head_object" value.
 
 If the object is locked, and is 
- - current version, it is transitioned to cloud post which it is made noncurrent with delete marker created.
- - noncurrent version, transition is skipped.
+
+* current version - it is transitioned to cloud post which it is made noncurrent with delete marker created.
+
+* noncurrent version - transition is skipped.
 
 
 Future Work
