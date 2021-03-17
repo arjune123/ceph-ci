@@ -86,6 +86,7 @@ A string that defines the target storage class to which the object transitions t
 * ``retain_object`` (true | false)
 
 If true, retains the metadata of the object transitioned to cloud. If false (default), the object is deleted post transition.
+This option is ignored for current versioned objects. For more details, refer to section "Versioned Objects" below.
 
 
 S3 Specific Configurables:
@@ -279,13 +280,6 @@ The cloud storage class once configured can then be used like any other storage 
 
 Since the transition is unidirectional, while configuring S3 lifecycle rules, the cloud storage class should be specified last among all the storage classes the object transitions to. Subsequent rules (if any) do not apply post transition to the cloud.
 
-To avoid object names collision across various buckets, source bucket name is prepended to the target object name. If the object is versioned, object versionid is appended to the end.
-
-Below is the sample object name format:
-::
-
-    s3://<target_path>/<source_bucket_name>/<source_object_name>(:<source_object_version_id>)
-
 Due to API limitations there is no way to preserve original object modification time and ETag but they get stored as metadata attributes on the destination objects, as shown below:
 
 ::
@@ -317,6 +311,26 @@ For example,
     # s3cmd get s3://bucket/lc.txt lc_restore.txt
     download: 's3://bucket/lc.txt' -> 'lc_restore.txt'  [1 of 1]
     ERROR: S3 error: 403 (InvalidObjectState)
+
+To avoid object names collision across various buckets, source bucket name is prepended to the target object name. If the object is versioned, object versionid is appended to the end.
+
+Below is the sample object name format:
+::
+
+    s3://<target_path>/<source_bucket_name>/<source_object_name>(-<source_object_version_id>)
+
+
+Versioned Objects
+"""""""""""""""""
+For versioned and locked objects, similar semantics as that of LifecycleExpiration are applied as stated below -
+
+If the bucket versioning is enabled and the object transitioned to cloud is
+ - current version, irrespective of what the config option "retain_object" value is, the object is not deleted but instead delete marker is created on the source rgw server.
+ - noncurrent version, it is deleted or retained based on the config option "retain_object" value.
+
+If the object is locked, and is 
+ - current version, it is transitioned to cloud post which it is made noncurrent with delete marker created.
+ - noncurrent version, transition is skipped.
 
 
 Future Work
