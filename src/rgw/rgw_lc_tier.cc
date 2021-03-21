@@ -40,7 +40,7 @@ static string get_key_oid(const rgw_obj_key& key)
   string oid = key.name;
   if (!key.instance.empty() &&
       !key.have_null_instance()) {
-    oid += string(":") + key.instance;
+    oid += string("-") + key.instance;
   }
   return oid;
 }
@@ -942,6 +942,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
   rgw_rest_obj rest_obj;
 
   rgw_lc_multipart_upload_info status;
+  std::shared_ptr<RGWStreamReadCRF> in_crf;
 
   map<string, string> new_attrs;
 
@@ -973,8 +974,9 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
       target_obj_name += get_key_instance((*tier_ctx.obj)->get_key());
     }
     rgw_obj dest_obj(target_bucket, target_obj_name);
-    std::shared_ptr<RGWStreamReadCRF> in_crf;
     rgw_rest_obj rest_obj;
+
+    reenter(this) {
 
     status_obj = rgw_raw_obj(tier_ctx.store->get_zone()->get_params().log_pool,
         "lc_multipart_" + (*tier_ctx.obj)->get_oid());
@@ -995,8 +997,6 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
           return -EIO;
         }
       }
-
-    reenter(this) {
 
       if (ret_err >= 0) {
         /* check here that mtime and size did not change */
@@ -1035,17 +1035,18 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
         status.part_size = std::max(min_conf_size, min_part_size);
         status.num_parts = (obj_size + status.part_size - 1) / status.part_size;
         status.cur_part = 1;
+        status.cur_ofs = 0;
       }
 
       for (; (uint32_t)status.cur_part <= status.num_parts; ++status.cur_part) {
-        ldout(tier_ctx.cct, 20) << "status.cur_part = "<<status.cur_part <<", info.ofs = "<< status.cur_ofs <<", info.size = "<< status.part_size<< ", obj size = " << status.obj_size<<dendl;
+        ldout(tier_ctx.cct, 20) << "status.cur_part = "<<status.cur_part <<", info.ofs = "<< status.cur_ofs <<", info.size = "<< status.part_size<< ", obj size = " << status.obj_size<< ", status.num_parts:" << status.num_parts << dendl;
         yield {
           rgw_lc_multipart_part_info& cur_part_info = status.parts[status.cur_part];
           cur_part_info.part_num = status.cur_part;
           cur_part_info.ofs = status.cur_ofs;
           cur_part_info.size = std::min((uint64_t)status.part_size, status.obj_size - status.cur_ofs);
 
-          status.cur_ofs += status.part_size;
+          status.cur_ofs += cur_part_info.size;
 
           call(new RGWLCStreamObjToCloudMultipartPartCR(tier_ctx,
                 status.upload_id,

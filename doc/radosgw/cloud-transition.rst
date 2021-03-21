@@ -325,17 +325,9 @@ Versioned Objects
 
 For versioned and locked objects, similar semantics as that of LifecycleExpiration are applied as stated below.
 
-If the bucket versioning is enabled and the object transitioned to cloud is
+* If the object is current, post transitioning to cloud, it is made noncurrent with delete marker created.
 
-* current version - irrespective of what the config option "retain_head_object" value is, the object is not deleted but instead delete marker is created on the source rgw server.
-
-* noncurrent version - it is deleted or retained based on the config option "retain_head_object" value.
-
-If the object is locked, and is 
-
-* current version - it is transitioned to cloud post which it is made noncurrent with delete marker created.
-
-* noncurrent version - transition is skipped.
+* If the object is noncurrent and is locked, its transition is skipped.
 
 
 Future Work
