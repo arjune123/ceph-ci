@@ -19,6 +19,7 @@ Cloud Storage Class Configuration
       "access_key": <access>,
       "secret": <secret>,
       "endpoint": <endpoint>,
+      "region": <region>,
       "host_style": <path | virtual>,
       "acls": [ { "type": <id | email | uri>,
                   "source_id": <source_id>,
@@ -45,6 +46,10 @@ The secret key for the remote cloud S3 service.
 * ``endpoint`` (string)
 
 URL of remote cloud S3 service endpoint.
+
+* ``region`` (string)
+
+The remote cloud S3 service region name.
 
 * ``host_style`` (path | virtual)
 

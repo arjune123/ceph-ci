@@ -2014,6 +2014,9 @@ int RGWZoneGroupPlacementTierS3::update_params(const JSONFormattable& config)
   if (config.exists("target_path")) {
     target_path = config["target_path"];
   }
+  if (config.exists("region")) {
+    region = config["region"];
+  }
   if (config.exists("host_style")) {
     string s;
     s = config["host_style"];
@@ -2086,6 +2089,9 @@ int RGWZoneGroupPlacementTierS3::clear_params(const JSONFormattable& config)
   }
   if (config.exists("target_path")) {
     target_path.clear();
+  }
+  if (config.exists("region")) {
+    region.clear();
   }
   if (config.exists("host_style")) {
     /* default */

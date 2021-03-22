@@ -489,7 +489,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
 
     RGWAccessControlPolicy policy;
 
-    r->send_ready(conn->get_key(), new_attrs, policy, false);
+    r->send_ready(conn->get_key(), new_attrs, policy);
   }
 
   void handle_headers(const map<string, string>& headers) {

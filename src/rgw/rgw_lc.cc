@@ -1384,8 +1384,9 @@ public:
 
     /* init */
     string id = "cloudid";
-    string endpoint=oc.tier.t.s3.endpoint; 
+    string endpoint = oc.tier.t.s3.endpoint;
     RGWAccessKey key = oc.tier.t.s3.key;
+    string region = oc.tier.t.s3.region;
     HostStyle host_style = oc.tier.t.s3.host_style;
     string bucket_name = oc.tier.t.s3.target_path;
     const RGWZoneGroup& zonegroup = oc.store->get_zone()->get_zonegroup();
@@ -1401,7 +1402,7 @@ public:
       boost::algorithm::to_lower(bucket_name);
     }
 
-    conn.reset(new S3RESTConn(oc.cct, oc.store, id, { endpoint }, key, host_style));
+    conn.reset(new S3RESTConn(oc.cct, oc.store, id, { endpoint }, key, region, host_style));
 
     /* http_mngr */
     RGWCoroutinesManager crs(oc.store->ctx(), oc.store->get_cr_registry());

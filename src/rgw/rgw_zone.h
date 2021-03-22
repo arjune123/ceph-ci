@@ -727,6 +727,7 @@ struct RGWZoneGroupPlacementTierS3 {
 #define DEFAULT_MULTIPART_SYNC_PART_SIZE (32 * 1024 * 1024)
   std::string endpoint;
   RGWAccessKey key;
+  std::string region;
   HostStyle host_style{PathStyle};
   string target_storage_class;
 
@@ -744,6 +745,7 @@ struct RGWZoneGroupPlacementTierS3 {
     ENCODE_START(1, 1, bl);
     encode(endpoint, bl);
     encode(key, bl);
+    encode(region, bl);
     string s = (host_style == PathStyle ? "path" : "virtual");
     encode(s, bl);
     encode(target_storage_class, bl);
@@ -758,6 +760,7 @@ struct RGWZoneGroupPlacementTierS3 {
     DECODE_START(1, bl);
     decode(endpoint, bl);
     decode(key, bl);
+    decode(region, bl);
     string s;
     decode(s, bl);
     if (s != "virtual") {
