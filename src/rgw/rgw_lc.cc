@@ -1280,10 +1280,10 @@ public:
      */
     if (oc.bucket->versioned() && oc.o.is_current() && !oc.o.is_delete_marker()) {
         ret = remove_expired_obj(oc.dpp, oc, false);
-        ldpp_dout(oc.dpp, 20) << "delete_tier_obj Object(key:" << oc.o.key << ") current & not delete_marker" << "s versioned_epoch:  " << oc.o.versioned_epoch << "flags: " << oc.o.flags << dendl;
+        ldpp_dout(oc.dpp, 20) << "delete_tier_obj Object(key:" << oc.o.key << ") current & not delete_marker" << " versioned_epoch:  " << oc.o.versioned_epoch << "flags: " << oc.o.flags << dendl;
     } else {
         ret = remove_expired_obj(oc.dpp, oc, true);
-        ldpp_dout(oc.dpp, 20) << "delete_tier_obj Object(key:" << oc.o.key << ") not current " << "s versioned_epoch:  " << oc.o.versioned_epoch << "flags: " << oc.o.flags << dendl;
+        ldpp_dout(oc.dpp, 20) << "delete_tier_obj Object(key:" << oc.o.key << ") not current " << "versioned_epoch:  " << oc.o.versioned_epoch << "flags: " << oc.o.flags << dendl;
     }
     return ret;
   }
@@ -1337,7 +1337,7 @@ public:
     tier_config.tier_placement = oc.tier;
     tier_config.is_multipart_upload = tier_ctx.is_multipart_upload;
 
-    pmanifest->set_tier_type("cloud");
+    pmanifest->set_tier_type("cloud-s3");
     pmanifest->set_tier_config(tier_config);
 
     /* check if its necessary */
@@ -1370,6 +1370,10 @@ public:
     obj_op->params.attrs = &attrs;
 
     r = obj_op->prepare(null_yield);
+    if (r < 0) {
+      return r;
+    }
+
 
     r = obj_op->write_meta(oc.dpp, tier_ctx.o.meta.size, 0, null_yield);
     if (r < 0) {

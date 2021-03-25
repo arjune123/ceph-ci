@@ -693,16 +693,21 @@ struct RGWTierACLMapping {
   void init(const JSONFormattable& config) {
     const string& t = config["type"];
 
-    type = get_acl_type(t);
+    if (t == "email") {
+      type = ACL_TYPE_EMAIL_USER;
+    } else if (t == "uri") {
+      type = ACL_TYPE_GROUP;
+    } else {
+      type = ACL_TYPE_CANON_USER;
+    }
+
     source_id = config["source_id"];
     dest_id = config["dest_id"];
   }
 
   void encode(bufferlist& bl) const {
     ENCODE_START(1, 1, bl);
-
-    string s = get_acl_type_str(type);
-    encode(s, bl);
+    encode((uint32_t)type, bl);
     encode(source_id, bl);
     encode(dest_id, bl);
     ENCODE_FINISH(bl);
@@ -710,10 +715,9 @@ struct RGWTierACLMapping {
 
   void decode(bufferlist::const_iterator& bl) {
     DECODE_START(1, bl);
-    string s;
-    decode(s, bl);
-
-    type = get_acl_type(s);
+    uint32_t it;
+    decode(it, bl);
+    type = (ACLGranteeTypeEnum)it;
     decode(source_id, bl);
     decode(dest_id, bl);
     DECODE_FINISH(bl);
@@ -746,8 +750,7 @@ struct RGWZoneGroupPlacementTierS3 {
     encode(endpoint, bl);
     encode(key, bl);
     encode(region, bl);
-    string s = (host_style == PathStyle ? "path" : "virtual");
-    encode(s, bl);
+    encode((uint32_t)host_style, bl);
     encode(target_storage_class, bl);
     encode(target_path, bl);
     encode(acl_mappings, bl);
@@ -761,13 +764,11 @@ struct RGWZoneGroupPlacementTierS3 {
     decode(endpoint, bl);
     decode(key, bl);
     decode(region, bl);
-    string s;
-    decode(s, bl);
-    if (s != "virtual") {
-      host_style = PathStyle;
-    } else {
-      host_style = VirtualStyle;
-    }
+
+    uint32_t it;
+    decode(it, bl);
+    host_style = (HostStyle)it;
+
     decode(target_storage_class, bl);
     decode(target_path, bl);
     decode(acl_mappings, bl);

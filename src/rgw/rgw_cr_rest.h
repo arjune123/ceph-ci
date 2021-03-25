@@ -9,8 +9,7 @@
 
 #include "rgw_coroutine.h"
 #include "rgw_rest_conn.h"
-#include "rgw_rados.h"
-
+#include "rgw_sal.h"
 
 struct rgw_rest_obj {
   rgw_obj_key key;

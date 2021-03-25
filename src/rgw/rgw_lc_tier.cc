@@ -77,7 +77,7 @@ static std::set<string> keep_headers = { "CONTENT_TYPE",
 static void init_headers(map<string, bufferlist>& attrs,
                          map<string, string>& headers)
 {
-  for (auto kv : attrs) {
+  for (auto& kv : attrs) {
     const char * name = kv.first.c_str();
     const auto aiter = rgw_to_http_attrs.find(name);
 
@@ -161,7 +161,7 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
     char buf[32];
     map<string, string> attrs = headers;
 
-    for (auto a : attrs) {
+    for (const auto& a : attrs) {
       ldout(cct, 20) << "GetCrf attr[" << a.first << "] = " << a.second <<dendl;
     }
     utime_t ut(obj_properties.mtime);
@@ -272,7 +272,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
     init_headers(attrs, rest_obj.attrs);
 
     rest_obj.acls.set_ctx(cct);
-    auto aiter = attrs.find(RGW_ATTR_ACL);
+    const auto aiter = attrs.find(RGW_ATTR_ACL);
     if (aiter != attrs.end()) {
       bufferlist& bl = aiter->second;
       auto bliter = bl.cbegin();
@@ -350,7 +350,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
     map<string, RGWTierACLMapping>& acl_mappings(obj_properties.target_acl_mappings);
     string target_storage_class = obj_properties.target_storage_class;
 
-    auto& new_attrs = *attrs;
+    auto new_attrs = *attrs;
 
     new_attrs.clear();
 
@@ -360,7 +360,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
       }
     }
 
-    auto acl = rest_obj.acls.get_acl();
+    const auto acl = rest_obj.acls.get_acl();
 
     map<int, vector<string> > access_map;
 
@@ -373,7 +373,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
 
         const auto& am = acl_mappings;
 
-        auto iter = am.find(orig_grantee);
+        const auto iter = am.find(orig_grantee);
         if (iter == am.end()) {
           ldout(cct, 20) << "acl_mappings: Could not find " << orig_grantee << " .. ignoring" << dendl;
           continue;
@@ -413,7 +413,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
       }
     }
 
-    for (auto aiter : access_map) {
+    for (const auto& aiter : access_map) {
       int grant_type = aiter.first;
 
       string header_str("x-amz-grant-");
@@ -438,7 +438,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
 
       string s;
 
-      for (auto viter : aiter.second) {
+      for (const auto& viter : aiter.second) {
         if (!s.empty()) {
           s.append(", ");
         }
@@ -493,7 +493,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
   }
 
   void handle_headers(const map<string, string>& headers) {
-    for (auto h : headers) {
+    for (const auto& h : headers) {
       if (h.first == "ETAG") {
         etag = h.second;
       }
@@ -804,7 +804,7 @@ class RGWLCCompleteMultipartCR : public RGWCoroutine {
     explicit CompleteMultipartReq(const map<int, rgw_lc_multipart_part_info>& _parts) : parts(_parts) {}
 
     void dump_xml(Formatter *f) const {
-      for (auto p : parts) {
+      for (const auto& p : parts) {
         f->open_object_section("Part");
         encode_xml("PartNumber", p.first, f);
         encode_xml("ETag", p.second.etag, f);
