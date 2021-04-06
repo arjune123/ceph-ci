@@ -128,7 +128,6 @@ int RGWLCStreamGetCRF::init()  {
       ldout(cct, 20) << "ERROR: " << __func__ << "(): conn->complete_request() returned ret=" << ret << dendl;
       return ret;
     }
-      ldout(cct, 20) << "XXXXXXXXXX: " << __func__ << "(): conn->complete_request() returned ret=" << ret << dendl;
     return 0;
   }
 
@@ -149,8 +148,8 @@ int RGWLCStreamGetCRF::is_already_tiered() {
     if (s.empty())
       s = attrs["x_amz_meta_rgwx_source_mtime"];
 
-    ldout(cct, 20) << "XXXXXXXXXXX is_already_tiered attrs[X_AMZ_META_RGWX_SOURCE_MTIME] = " << s <<dendl;
-    ldout(cct, 20) << "XXXXXXXXXX is_already_tiered mtime buf = " << buf <<dendl;
+    ldout(cct, 20) << "is_already_tiered attrs[X_AMZ_META_RGWX_SOURCE_MTIME] = " << s <<dendl;
+    ldout(cct, 20) << "is_already_tiered mtime buf = " << buf <<dendl;
 
     if (!s.empty() && !strcmp(s.c_str(), buf)){
       return 1;
@@ -324,13 +323,11 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
     map<string, RGWTierACLMapping>& acl_mappings(obj_properties.target_acl_mappings);
     string target_storage_class = obj_properties.target_storage_class;
 
-    auto new_attrs = *attrs;
-
-    new_attrs.clear();
+    attrs->clear();
 
     for (auto& hi : rest_obj.attrs) {
       if (keep_attr(hi.first)) {
-        new_attrs.insert(hi);
+        attrs->insert(hi);
       }
     }
 
@@ -421,33 +418,36 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
 
       ldout(cct, 20) << "acl_mappings: set acl: " << header_str << "=" << s << dendl;
 
-      new_attrs[header_str] = s;
+      (*attrs)[header_str] = s;
     }
 
     /* Copy target storage class */
     if (!target_storage_class.empty()) {
-      new_attrs["x-amz-storage-class"] = target_storage_class;
+      (*attrs)["x-amz-storage-class"] = target_storage_class;
     } else {
-      new_attrs["x-amz-storage-class"] = "STANDARD";
+      (*attrs)["x-amz-storage-class"] = "STANDARD";
     }
 
     /* New attribute to specify its transitioned from RGW */
-    new_attrs["x-amz-meta-rgwx-source"] = "rgw";
+    (*attrs)["x-amz-meta-rgwx-source"] = "rgw";
 
     char buf[32];
     snprintf(buf, sizeof(buf), "%llu", (long long)obj_properties.versioned_epoch);
-    new_attrs["x-amz-meta-rgwx-versioned-epoch"] = buf;
+    (*attrs)["x-amz-meta-rgwx-versioned-epoch"] = buf;
 
     utime_t ut(obj_properties.mtime);
     snprintf(buf, sizeof(buf), "%lld.%09lld",
         (long long)ut.sec(),
         (long long)ut.nsec());
 
-    new_attrs["x-amz-meta-rgwx-source-mtime"] = buf;
-    new_attrs["x-amz-meta-rgwx-source-etag"] = obj_properties.etag;
-    new_attrs["x-amz-meta-rgwx-source-key"] = rest_obj.key.name;
+    (*attrs)["x-amz-meta-rgwx-source-mtime"] = buf;
+    (*attrs)["x-amz-meta-rgwx-source-etag"] = obj_properties.etag;
+    (*attrs)["x-amz-meta-rgwx-source-key"] = rest_obj.key.name;
     if (!rest_obj.key.instance.empty()) {
-      new_attrs["x-amz-meta-rgwx-source-version-id"] = rest_obj.key.instance;
+      (*attrs)["x-amz-meta-rgwx-source-version-id"] = rest_obj.key.instance;
+    }
+    for (const auto& a : (*attrs)) {
+      ldout(cct, 30) << "init_send_attrs attr[" << a.first << "] = " << a.second <<dendl;
     }
   }
 
@@ -575,7 +575,7 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
                                        upload_id(_upload_id), part_info(_part_info), petag(_petag) {}
 
   int operate() override {
-    ldout(cct, 0) << "In CloudMultipartPartCR XXXXXXXXXXXXXXXXXXX" << dendl;
+    ldout(cct, 0) << "In CloudMultipartPartCR " << dendl;
     rgw_lc_obj_properties obj_properties(tier_ctx.o.meta.mtime, tier_ctx.o.meta.etag,
                                          tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
                                          tier_ctx.target_storage_class);
@@ -1107,11 +1107,11 @@ int RGWLCCloudCheckCR::operate() {
     }
     if (get_crf.get()->is_already_tiered()) {
       *already_tiered = true;
-      ldout(tier_ctx.cct, 20) << "XXXXXXXXXXXXX is_already_tiered true" << dendl;
+      ldout(tier_ctx.cct, 20) << "is_already_tiered true" << dendl;
       return set_cr_done(); 
     }
 
-    ldout(tier_ctx.cct, 20) << "XXXXXXXXXXXXXXXX is_already_tiered false..going with out_crf writing" << dendl;
+    ldout(tier_ctx.cct, 20) << "is_already_tiered false..going with out_crf writing" << dendl;
 
     return set_cr_done();
   }
