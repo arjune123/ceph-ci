@@ -105,32 +105,7 @@ static void init_headers(map<string, bufferlist>& attrs,
   }
 }
 
-class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
-{
-  RGWRESTConn::get_obj_params req_params;
-
-  CephContext *cct;
-  RGWHTTPManager *http_manager;
-  rgw_lc_obj_properties obj_properties;
-  std::shared_ptr<RGWRESTConn> conn;
-  rgw::sal::RGWObject* dest_obj;
-  string etag;
-  RGWRESTStreamRWRequest *in_req;
-  map<string, string> headers;
-
-  public:
-  RGWLCStreamGetCRF(CephContext *_cct,
-      RGWCoroutinesEnv *_env,
-      RGWCoroutine *_caller,
-      RGWHTTPManager *_http_manager,
-      const rgw_lc_obj_properties&  _obj_properties,
-      std::shared_ptr<RGWRESTConn> _conn,
-      rgw::sal::RGWObject* _dest_obj) :
-    RGWStreamReadHTTPResourceCRF(_cct, _env, _caller, _http_manager, _dest_obj->get_key()),
-                                 cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties),
-                                 conn(_conn), dest_obj(_dest_obj) {}
-
-  int init()  {
+int RGWLCStreamGetCRF::init()  {
     /* init input connection */
     req_params.get_op = false; /* Need only headers */
     req_params.prepend_metadata = true;
@@ -148,16 +123,16 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
     }
 
     /* fetch only headers */
-    ret = conn->complete_request(in_req, nullptr, nullptr,
-        nullptr, nullptr, &headers, null_yield);
+    ret = conn->complete_request(in_req, nullptr, nullptr, nullptr, nullptr, &headers, null_yield);
     if (ret < 0 && ret != -ENOENT) {
       ldout(cct, 20) << "ERROR: " << __func__ << "(): conn->complete_request() returned ret=" << ret << dendl;
       return ret;
     }
+      ldout(cct, 20) << "XXXXXXXXXX: " << __func__ << "(): conn->complete_request() returned ret=" << ret << dendl;
     return 0;
   }
 
-  int is_already_tiered() {
+int RGWLCStreamGetCRF::is_already_tiered() {
     char buf[32];
     map<string, string> attrs = headers;
 
@@ -174,15 +149,14 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
     if (s.empty())
       s = attrs["x_amz_meta_rgwx_source_mtime"];
 
-    ldout(cct, 20) << "is_already_tiered attrs[X_AMZ_META_RGWX_SOURCE_MTIME] = " << s <<dendl;
-    ldout(cct, 20) << "is_already_tiered mtime buf = " << buf <<dendl;
+    ldout(cct, 20) << "XXXXXXXXXXX is_already_tiered attrs[X_AMZ_META_RGWX_SOURCE_MTIME] = " << s <<dendl;
+    ldout(cct, 20) << "XXXXXXXXXX is_already_tiered mtime buf = " << buf <<dendl;
 
     if (!s.empty() && !strcmp(s.c_str(), buf)){
       return 1;
     }
     return 0;
   }
-};
 
 class RGWLCStreamReadCRF : public RGWStreamReadCRF
 {
@@ -1094,59 +1068,50 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
 
 int RGWLCCloudCheckCR::operate() {
   /* Check if object has already been transitioned */
-  rgw_lc_obj_properties obj_properties(tier_ctx.o.meta.mtime, tier_ctx.o.meta.etag,
-                                       tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
-                                       tier_ctx.target_storage_class);
-
-  RGWBucketInfo b;
-  string target_obj_name;
-  int reterr = 0;
-
-  b.bucket.name = tier_ctx.target_bucket_name;
-  target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
-                    (*tier_ctx.obj)->get_name();
+  reenter(this) {
+    b.bucket.name = tier_ctx.target_bucket_name;
+    target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
+                      (*tier_ctx.obj)->get_name();
     if (!tier_ctx.o.is_current()) {
       target_obj_name += get_key_instance((*tier_ctx.obj)->get_key());
     }
 
-  std::unique_ptr<rgw::sal::RGWBucket> dest_bucket;
-  std::unique_ptr<rgw::sal::RGWObject> dest_obj;
-
-
-  reterr = tier_ctx.store->get_bucket(nullptr, b, &dest_bucket);
-  if (reterr < 0) {
-    ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize dest_bucket - " << tier_ctx.target_bucket_name << " , reterr = " << reterr << dendl;
-    return reterr;
-  }
+    ret = tier_ctx.store->get_bucket(nullptr, b, &dest_bucket);
+    if (ret < 0) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize dest_bucket - " << tier_ctx.target_bucket_name << " , reterr = " << ret << dendl;
+        return ret;
+    }
   
-  dest_obj = dest_bucket->get_object(rgw_obj_key(target_obj_name));
-  if (!dest_obj) {
-    ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize dest_object path - " << target_obj_name << dendl;
-    return -1;
-  }
+    dest_obj = dest_bucket->get_object(rgw_obj_key(target_obj_name));
+    if (!dest_obj) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to initialize dest_object path - " << target_obj_name << dendl;
+        return -1;
+    }
 
-  std::shared_ptr<RGWLCStreamGetCRF> get_crf;
-  get_crf.reset(new RGWLCStreamGetCRF((CephContext *)(tier_ctx.cct), get_env(), this,
-        (RGWHTTPManager*)(tier_ctx.http_manager),
-        obj_properties, tier_ctx.conn, static_cast<rgw::sal::RGWObject *>(dest_obj.get())));
-  int ret = 0;
+    get_crf.reset(new RGWLCStreamGetCRF(tier_ctx.cct, get_env(), this, tier_ctx.http_manager, obj_properties,
+                  tier_ctx.conn, dest_obj.get()));
 
-  reenter(this) {
     /* Having yield here doesn't seem to wait for init2() to fetch the headers
      * before calling is_already_tiered() below
      */
+    yield {
     ret = get_crf->init();
-    if (ret < 0) {
-      ldout(tier_ctx.cct, 0) << "ERROR: failed to fetch HEAD from cloud for obj=" << tier_ctx.obj << " , ret = " << ret << dendl;
-      return set_cr_error(ret);
+      if (ret < 0) {
+        ldout(tier_ctx.cct, 0) << "ERROR: failed to fetch HEAD from cloud for obj=" << tier_ctx.obj << " , ret = " << ret << dendl;
+        return set_cr_error(ret);
+        }
     }
-    if ((static_cast<RGWLCStreamGetCRF *>(get_crf.get()))->is_already_tiered()) {
+    if (retcode < 0) {
+      ldout(tier_ctx.cct, 20) << __func__ << ": get_crf()->init retcode=" << retcode << dendl;
+      return set_cr_error(retcode);
+    }
+    if (get_crf.get()->is_already_tiered()) {
       *already_tiered = true;
-      ldout(tier_ctx.cct, 20) << "is_already_tiered true" << dendl;
+      ldout(tier_ctx.cct, 20) << "XXXXXXXXXXXXX is_already_tiered true" << dendl;
       return set_cr_done(); 
     }
 
-    ldout(tier_ctx.cct, 20) << "is_already_tiered false..going with out_crf writing" << dendl;
+    ldout(tier_ctx.cct, 20) << "XXXXXXXXXXXXXXXX is_already_tiered false..going with out_crf writing" << dendl;
 
     return set_cr_done();
   }

@@ -50,39 +50,6 @@ struct RGWLCCloudTierCtx {
               target_storage_class(_storage_class), http_manager(_http) {}
 };
 
-class RGWLCCloudTierCR : public RGWCoroutine {
-  RGWLCCloudTierCtx& tier_ctx;
-  bufferlist out_bl;
-  int retcode;
-  struct CreateBucketResult {
-    string code;
-
-    void decode_xml(XMLObj *obj) {
-      RGWXMLDecoder::decode_xml("Code", code, obj);
-    }
-  } result;
-
-  public:
-    RGWLCCloudTierCR(RGWLCCloudTierCtx& _tier_ctx) :
-          RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx) {}
-
-    int operate() override;
-};
-
-class RGWLCCloudCheckCR : public RGWCoroutine {
-  RGWLCCloudTierCtx& tier_ctx;
-  bufferlist bl;
-  bool need_retry{false};
-  int retcode;
-  bool *already_tiered;
-
-  public:
-    RGWLCCloudCheckCR(RGWLCCloudTierCtx& _tier_ctx, bool *_al_ti) :
-          RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx), already_tiered(_al_ti) {}
-
-    int operate() override;
-};
-
 struct rgw_lc_multipart_part_info {
   int part_num{0};
   uint64_t ofs{0};
@@ -189,5 +156,76 @@ struct rgw_lc_multipart_upload_info {
   }
 };
 WRITE_CLASS_ENCODER(rgw_lc_multipart_upload_info)
+
+class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
+{
+  RGWRESTConn::get_obj_params req_params;
+
+  CephContext *cct;
+  RGWHTTPManager *http_manager;
+  rgw_lc_obj_properties obj_properties;
+  std::shared_ptr<RGWRESTConn> conn;
+  rgw::sal::RGWObject* dest_obj;
+  string etag;
+  RGWRESTStreamRWRequest *in_req;
+  map<string, string> headers;
+
+  public:
+  RGWLCStreamGetCRF(CephContext *_cct,
+      RGWCoroutinesEnv *_env,
+      RGWCoroutine *_caller,
+      RGWHTTPManager *_http_manager,
+      const rgw_lc_obj_properties&  _obj_properties,
+      std::shared_ptr<RGWRESTConn> _conn,
+      rgw::sal::RGWObject* _dest_obj) :
+    RGWStreamReadHTTPResourceCRF(_cct, _env, _caller, _http_manager, _dest_obj->get_key()),
+                                 cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties),
+                                 conn(_conn), dest_obj(_dest_obj) {}
+  int init();
+  int is_already_tiered();
+};
+
+class RGWLCCloudTierCR : public RGWCoroutine {
+  RGWLCCloudTierCtx& tier_ctx;
+  bufferlist out_bl;
+  int retcode;
+  struct CreateBucketResult {
+    string code;
+
+    void decode_xml(XMLObj *obj) {
+      RGWXMLDecoder::decode_xml("Code", code, obj);
+    }
+  } result;
+
+  public:
+    RGWLCCloudTierCR(RGWLCCloudTierCtx& _tier_ctx) :
+          RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx) {}
+
+    int operate() override;
+};
+
+class RGWLCCloudCheckCR : public RGWCoroutine {
+  RGWLCCloudTierCtx& tier_ctx;
+  bufferlist bl;
+  bool need_retry{false};
+  int retcode;
+  bool *already_tiered;
+  rgw_lc_obj_properties obj_properties;
+  RGWBucketInfo b;
+  string target_obj_name;
+  int ret = 0;
+  std::unique_ptr<rgw::sal::RGWBucket> dest_bucket;
+  std::unique_ptr<rgw::sal::RGWObject> dest_obj;
+  std::unique_ptr<RGWLCStreamGetCRF> get_crf;
+
+  public:
+    RGWLCCloudCheckCR(RGWLCCloudTierCtx& _tier_ctx, bool *_al_ti) :
+          RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx), already_tiered(_al_ti),
+          obj_properties(tier_ctx.o.meta.mtime, tier_ctx.o.meta.etag,
+                         tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
+                         tier_ctx.target_storage_class){}
+
+    int operate() override;
+};
 
 #endif
