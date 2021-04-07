@@ -239,6 +239,42 @@ void *RGWLC::LCWorker::entry() {
   return NULL;
 }
 
+int RGWLC::start_http_manager() {
+  int ret = 0;
+
+  if (is_http_mgr_started)
+    return 0;
+
+  /* http_mngr */
+  crs.reset(new RGWCoroutinesManager(store->ctx(), store->get_cr_registry()));
+  http_manager.reset(new RGWHTTPManager(store->ctx(), crs.get()->get_completion_mgr()));
+
+  ret = http_manager->start();
+  if (ret < 0) {
+    dout(5) << "RGWLC:: http_manager->start() failed ret = "
+	  << ret << dendl;
+    return ret;
+  }
+
+  is_http_mgr_started = true;
+  return ret;
+}
+
+int RGWLC::stop_http_manager() {
+  if (!is_http_mgr_started) {
+    return 0;
+  }
+
+  if (http_manager)
+    http_manager->stop();
+
+  http_manager.reset();
+  crs.reset();
+  
+  is_http_mgr_started = false;
+  return 0;
+}
+
 void RGWLC::initialize(CephContext *_cct, rgw::sal::Store* _store) {
   cct = _cct;
   store = _store;
@@ -265,6 +301,7 @@ void RGWLC::initialize(CephContext *_cct, rgw::sal::Store* _store) {
 void RGWLC::finalize()
 {
   delete[] obj_names;
+  stop_http_manager();
 }
 
 bool RGWLC::if_already_run_today(time_t start_date)
@@ -1408,19 +1445,24 @@ public:
 
     conn.reset(new S3RESTConn(oc.cct, oc.store, id, { endpoint }, key, region, host_style));
 
-    /* http_mngr */
-    RGWCoroutinesManager crs(oc.store->ctx(), oc.store->get_cr_registry());
-    RGWHTTPManager http_manager(oc.store->ctx(), crs.get_completion_mgr());
-
-    int ret = http_manager.start();
+    int ret = oc.env.worker->get_lc()->start_http_manager();
     if (ret < 0) {
-      ldpp_dout(oc.dpp, 0) << "failed in http_manager.start() ret=" << ret << dendl;
+      ldpp_dout(oc.dpp, 0) << "failed in start_http_manager() ret=" << ret << dendl;
       return ret;
+    }
+
+    RGWCoroutinesManager *crs = oc.env.worker->get_lc()->get_crs();
+    RGWHTTPManager *http_manager = oc.env.worker->get_lc()->get_http_manager();
+
+    if (!crs || !http_manager) {
+      /* maybe race..return and retry */
+      ldpp_dout(oc.dpp, 0) << " http_manager and crs not initialized" << dendl;
+      return -1;
     }
 
     RGWLCCloudTierCtx tier_ctx(oc.cct, oc.dpp, oc.o, oc.store, oc.bucket->get_info(),
                         &oc.obj, oc.rctx, conn, bucket_name,
-                        oc.tier.t.s3.target_storage_class, &http_manager);
+                        oc.tier.t.s3.target_storage_class, http_manager);
     tier_ctx.acl_mappings = oc.tier.t.s3.acl_mappings;
     tier_ctx.multipart_min_part_size = oc.tier.t.s3.multipart_min_part_size;
     tier_ctx.multipart_sync_threshold = oc.tier.t.s3.multipart_sync_threshold;
@@ -1432,7 +1474,7 @@ public:
      * verify if the object is already transitioned. And since its just a best
      * effort, do not bail out in case of any errors.
      */
-    ret = crs.run(new RGWLCCloudCheckCR(tier_ctx, &al_tiered));
+    ret = crs->run(new RGWLCCloudCheckCR(tier_ctx, &al_tiered));
     
     if (ret < 0) {
       ldpp_dout(oc.dpp, 0) << "ERROR: failed in RGWCloudCheckCR() ret=" << ret << dendl;
@@ -1440,10 +1482,9 @@ public:
 
     if (al_tiered) {
       ldout(tier_ctx.cct, 20) << "Object (" << oc.o.key << ") is already tiered" << dendl;
-      http_manager.stop();
       return 0;
     } else {
-	  ret = crs.run(new RGWLCCloudTierCR(tier_ctx));
+	  ret = crs->run(new RGWLCCloudTierCR(tier_ctx));
     }
          
     if (ret < 0) {
@@ -1463,7 +1504,6 @@ public:
         return ret;
       }
     }
-    http_manager.stop();
 
     return 0;
   }
@@ -1828,6 +1868,8 @@ int RGWLC::bucket_lc_post(int index, int max_lock_sec,
       sleep(5);
       continue;
     }
+    worker->get_lc()->stop_http_manager();
+
     if (ret < 0)
       return 0;
     ldpp_dout(this, 20) << "RGWLC::bucket_lc_post() lock " << obj_names[index]
