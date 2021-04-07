@@ -358,12 +358,6 @@ RGWStreamWriteCR::RGWStreamWriteCR(CephContext *_cct, RGWHTTPManager *_mgr,
 RGWStreamWriteCR::~RGWStreamWriteCR() { }
 
 int RGWStreamWriteCR::operate() {
-  off_t ofs;
-  off_t end;
-  int ret;
-  uint64_t read_len = 0;
-  rgw_rest_obj rest_obj;
-
   reenter(this) {
     ret = in_crf->init();
     if (ret < 0) {
@@ -375,10 +369,12 @@ int RGWStreamWriteCR::operate() {
 
     do {
       bl.clear();
-      ret = in_crf->read(ofs, end, bl);
-      if (ret < 0) {
-        ldout(cct, 0) << "ERROR: fail to read object data, ret = " << ret << dendl;
-        return set_cr_error(ret);
+      yield {
+        ret = in_crf->read(ofs, end, bl);
+        if (ret < 0) {
+          ldout(cct, 0) << "ERROR: fail to read object data, ret = " << ret << dendl;
+          return set_cr_error(ret);
+        }
       }
       if (retcode < 0) {
         ldout(cct, 20) << __func__ << ": read_op.read() retcode=" << retcode << dendl;
@@ -409,12 +405,11 @@ int RGWStreamWriteCR::operate() {
       total_read += bl.length();
 
       do {
-        /* Cant do yield here as read_op doesnt work well with yield and results
-         * in deadlock.
-         */
-        ret = out_crf->write(bl, &need_retry);
-        if (ret < 0)  {
-          return set_cr_error(ret);
+        yield {
+          ret = out_crf->write(bl, &need_retry);
+          if (ret < 0)  {
+            return set_cr_error(ret);
+          }
         }
 
         if (retcode < 0) {

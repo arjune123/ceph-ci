@@ -636,6 +636,11 @@ class RGWStreamWriteCR : public RGWCoroutine {
   bool sent_attrs{false};
   uint64_t total_read{0};
   int ret{0};
+  off_t ofs;
+  off_t end;
+  uint64_t read_len = 0;
+  rgw_rest_obj rest_obj;
+
 public:
   RGWStreamWriteCR(CephContext *_cct, RGWHTTPManager *_mgr,
                     std::shared_ptr<RGWStreamReadCRF>& _in_crf,
