@@ -11,6 +11,7 @@
 #include "rgw_coroutine.h"
 #include "rgw_rados.h"
 #include "rgw_zone.h"
+#include "rgw_sal_rados.h"
 
 #define DEFAULT_MULTIPART_SYNC_PART_SIZE (32 * 1024 * 1024)
 #define MULTIPART_MIN_POSSIBLE_PART_SIZE (5 * 1024 * 1024)
