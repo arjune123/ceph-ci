@@ -591,13 +591,13 @@ public:
 
 class RGWStreamReadCRF {
 public:
-  std::unique_ptr<rgw::sal::RGWObject::ReadOp> read_op;
+  std::unique_ptr<rgw::sal::Object::ReadOp> read_op;
   off_t ofs;
   off_t end;
   rgw_rest_obj rest_obj;
-  std::unique_ptr<rgw::sal::RGWObject>* obj;
+  std::unique_ptr<rgw::sal::Object>* obj;
 
-  RGWStreamReadCRF(std::unique_ptr<rgw::sal::RGWObject>* obj, RGWObjectCtx& obj_ctx);
+  RGWStreamReadCRF(std::unique_ptr<rgw::sal::Object>* obj, RGWObjectCtx& obj_ctx);
   virtual ~RGWStreamReadCRF();
 
   virtual int init() {return 0; }

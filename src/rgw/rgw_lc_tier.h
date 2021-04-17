@@ -21,11 +21,11 @@ struct RGWLCCloudTierCtx {
 
   /* Source */
   rgw_bucket_dir_entry& o;
-  rgw::sal::RGWStore *store;
+  rgw::sal::Store *store;
   RGWBucketInfo& bucket_info;
   string storage_class;
 
-  std::unique_ptr<rgw::sal::RGWObject>* obj;
+  std::unique_ptr<rgw::sal::Object>* obj;
   RGWObjectCtx& rctx;
 
   /* Remote */
@@ -41,8 +41,8 @@ struct RGWLCCloudTierCtx {
   bool is_multipart_upload{false};
 
   RGWLCCloudTierCtx(CephContext* _cct, const DoutPrefixProvider *_dpp,
-            rgw_bucket_dir_entry& _o, rgw::sal::RGWStore* _store,
-            RGWBucketInfo &_binfo, std::unique_ptr<rgw::sal::RGWObject>* _obj,
+            rgw_bucket_dir_entry& _o, rgw::sal::Store* _store,
+            RGWBucketInfo &_binfo, std::unique_ptr<rgw::sal::Object>* _obj,
             RGWObjectCtx& _rctx, std::shared_ptr<RGWRESTConn> _conn, string _bucket,
             string _storage_class, RGWHTTPManager *_http)
             : cct(_cct), dpp(_dpp), o(_o), store(_store), bucket_info(_binfo),
@@ -165,7 +165,7 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
   RGWHTTPManager *http_manager;
   rgw_lc_obj_properties obj_properties;
   std::shared_ptr<RGWRESTConn> conn;
-  rgw::sal::RGWObject* dest_obj;
+  rgw::sal::Object* dest_obj;
   string etag;
   RGWRESTStreamRWRequest *in_req;
   map<string, string> headers;
@@ -177,7 +177,7 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
       RGWHTTPManager *_http_manager,
       const rgw_lc_obj_properties&  _obj_properties,
       std::shared_ptr<RGWRESTConn> _conn,
-      rgw::sal::RGWObject* _dest_obj) :
+      rgw::sal::Object* _dest_obj) :
     RGWStreamReadHTTPResourceCRF(_cct, _env, _caller, _http_manager, _dest_obj->get_key()),
                                  cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties),
                                  conn(_conn), dest_obj(_dest_obj) {}
@@ -214,8 +214,8 @@ class RGWLCCloudCheckCR : public RGWCoroutine {
   RGWBucketInfo b;
   string target_obj_name;
   int ret = 0;
-  std::unique_ptr<rgw::sal::RGWBucket> dest_bucket;
-  std::unique_ptr<rgw::sal::RGWObject> dest_obj;
+  std::unique_ptr<rgw::sal::Bucket> dest_bucket;
+  std::unique_ptr<rgw::sal::Object> dest_obj;
   std::unique_ptr<RGWLCStreamGetCRF> get_crf;
 
   public:

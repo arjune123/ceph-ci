@@ -347,7 +347,7 @@ int RGWStreamSpliceCR::operate(const DoutPrefixProvider *dpp) {
   return 0;
 }
 
-RGWStreamReadCRF::RGWStreamReadCRF(std::unique_ptr<rgw::sal::RGWObject>* obj,
+RGWStreamReadCRF::RGWStreamReadCRF(std::unique_ptr<rgw::sal::Object>* obj,
              RGWObjectCtx& obj_ctx) : read_op((*obj)->get_read_op(&obj_ctx)) {}
 RGWStreamReadCRF::~RGWStreamReadCRF() {}
 

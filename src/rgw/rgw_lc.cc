@@ -1332,7 +1332,7 @@ public:
 
     real_time read_mtime;
 
-    std::unique_ptr<rgw::sal::RGWObject::ReadOp> read_op(oc.obj->get_read_op(&oc.rctx));
+    std::unique_ptr<rgw::sal::Object::ReadOp> read_op(oc.obj->get_read_op(&oc.rctx));
 
     read_op->params.lastmod = &read_mtime;
 
@@ -1350,7 +1350,7 @@ public:
     (*tier_ctx.obj)->set_atomic(&tier_ctx.rctx);
     
     RGWObjState *s = tier_ctx.rctx.get_state((*tier_ctx.obj)->get_obj());
-    std::unique_ptr<rgw::sal::RGWObject::WriteOp> obj_op(oc.obj->get_write_op(&oc.rctx));
+    std::unique_ptr<rgw::sal::Object::WriteOp> obj_op(oc.obj->get_write_op(&oc.rctx));
 
     obj_op->params.modify_tail = true;
     obj_op->params.flags = PUT_OBJ_CREATE;

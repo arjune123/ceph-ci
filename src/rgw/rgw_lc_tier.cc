@@ -163,7 +163,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
   const DoutPrefixProvider *dpp;
   map<string, bufferlist> attrs;
   uint64_t obj_size;
-  std::unique_ptr<rgw::sal::RGWObject>* obj;
+  std::unique_ptr<rgw::sal::Object>* obj;
   const real_time &mtime;
 
   bool multipart;
@@ -173,7 +173,7 @@ class RGWLCStreamReadCRF : public RGWStreamReadCRF
 
   public:
   RGWLCStreamReadCRF(CephContext *_cct, const DoutPrefixProvider *_dpp,
-                     RGWObjectCtx& obj_ctx, std::unique_ptr<rgw::sal::RGWObject>* _obj,
+                     RGWObjectCtx& obj_ctx, std::unique_ptr<rgw::sal::Object>* _obj,
                      const real_time &_mtime) :
                      RGWStreamReadCRF(_obj, obj_ctx), cct(_cct),
                      dpp(_dpp), obj(_obj), mtime(_mtime) {}
@@ -275,7 +275,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
   RGWHTTPManager *http_manager;
   rgw_lc_obj_properties obj_properties;
   std::shared_ptr<RGWRESTConn> conn;
-  rgw::sal::RGWObject* dest_obj;
+  rgw::sal::Object* dest_obj;
   string etag;
 
   public:
@@ -285,7 +285,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
       RGWHTTPManager *_http_manager,
       const rgw_lc_obj_properties&  _obj_properties,
       std::shared_ptr<RGWRESTConn> _conn,
-      rgw::sal::RGWObject* _dest_obj) :
+      rgw::sal::Object* _dest_obj) :
     RGWStreamWriteHTTPResourceCRF(_cct, _env, _caller, _http_manager),
     cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties), conn(_conn), dest_obj(_dest_obj) {
     }
@@ -491,15 +491,15 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
   std::shared_ptr<RGWStreamReadCRF> in_crf;
   std::shared_ptr<RGWStreamWriteHTTPResourceCRF> out_crf;
 
-  std::unique_ptr<rgw::sal::RGWBucket> dest_bucket;
-  std::unique_ptr<rgw::sal::RGWObject> dest_obj;
+  std::unique_ptr<rgw::sal::Bucket> dest_bucket;
+  std::unique_ptr<rgw::sal::Object> dest_obj;
 
   rgw_lc_obj_properties obj_properties;
   RGWBucketInfo b;
   string target_obj_name;
   int ret = 0;
 
-  rgw::sal::RGWObject *o;
+  rgw::sal::Object *o;
 
   public:
   RGWLCStreamObjToCloudPlainCR(RGWLCCloudTierCtx& _tier_ctx)
@@ -565,8 +565,8 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
   std::shared_ptr<RGWStreamReadCRF> in_crf;
   std::shared_ptr<RGWStreamWriteHTTPResourceCRF> out_crf;
 
-  std::unique_ptr<rgw::sal::RGWBucket> dest_bucket;
-  std::unique_ptr<rgw::sal::RGWObject> dest_obj;
+  std::unique_ptr<rgw::sal::Bucket> dest_bucket;
+  std::unique_ptr<rgw::sal::Object> dest_obj;
 
   rgw_lc_obj_properties obj_properties;
   RGWBucketInfo b;
