@@ -182,7 +182,7 @@ class RGWLCStreamGetCRF : public RGWStreamReadHTTPResourceCRF
     RGWStreamReadHTTPResourceCRF(_cct, _env, _caller, _http_manager, _dest_obj->get_key()),
                                  cct(_cct), http_manager(_http_manager), obj_properties(_obj_properties),
                                  conn(_conn), dest_obj(_dest_obj) {}
-  int init();
+  int init(const DoutPrefixProvider *dpp);
   int is_already_tiered();
 };
 
@@ -202,7 +202,7 @@ class RGWLCCloudTierCR : public RGWCoroutine {
     RGWLCCloudTierCR(RGWLCCloudTierCtx& _tier_ctx) :
           RGWCoroutine(_tier_ctx.cct), tier_ctx(_tier_ctx) {}
 
-    int operate() override;
+    int operate(const DoutPrefixProvider *dpp) override;
 };
 
 class RGWLCCloudCheckCR : public RGWCoroutine {
@@ -226,7 +226,7 @@ class RGWLCCloudCheckCR : public RGWCoroutine {
                          tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
                          tier_ctx.target_storage_class){}
 
-    int operate() override;
+    int operate(const DoutPrefixProvider *dpp) override;
 };
 
 #endif

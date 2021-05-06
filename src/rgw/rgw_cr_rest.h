@@ -647,5 +647,5 @@ public:
                     std::shared_ptr<RGWStreamWriteHTTPResourceCRF>& _out_crf);
   ~RGWStreamWriteCR();
 
-  int operate() override;
+  int operate(const DoutPrefixProvider *dpp) override;
 };

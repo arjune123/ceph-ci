@@ -1474,7 +1474,7 @@ public:
      * verify if the object is already transitioned. And since its just a best
      * effort, do not bail out in case of any errors.
      */
-    ret = crs->run(new RGWLCCloudCheckCR(tier_ctx, &al_tiered));
+    ret = crs->run(oc.dpp, new RGWLCCloudCheckCR(tier_ctx, &al_tiered));
     
     if (ret < 0) {
       ldpp_dout(oc.dpp, 0) << "ERROR: failed in RGWCloudCheckCR() ret=" << ret << dendl;
@@ -1484,7 +1484,7 @@ public:
       ldout(tier_ctx.cct, 20) << "Object (" << oc.o.key << ") is already tiered" << dendl;
       return 0;
     } else {
-	  ret = crs->run(new RGWLCCloudTierCR(tier_ctx));
+	  ret = crs->run(oc.dpp, new RGWLCCloudTierCR(tier_ctx));
     }
          
     if (ret < 0) {

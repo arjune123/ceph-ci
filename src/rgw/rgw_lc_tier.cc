@@ -105,7 +105,7 @@ static void init_headers(map<string, bufferlist>& attrs,
   }
 }
 
-int RGWLCStreamGetCRF::init()  {
+int RGWLCStreamGetCRF::init(const DoutPrefixProvider *dpp)  {
     /* init input connection */
     req_params.get_op = false; /* Need only headers */
     req_params.prepend_metadata = true;
@@ -116,7 +116,7 @@ int RGWLCStreamGetCRF::init()  {
     string etag;
     real_time set_mtime;
 
-    int ret = conn->get_obj(dest_obj, req_params, true /* send */, &in_req);
+    int ret = conn->get_obj(dpp, dest_obj, req_params, true /* send */, &in_req);
     if (ret < 0) {
       ldout(cct, 0) << "ERROR: " << __func__ << "(): conn->get_obj() returned ret=" << ret << dendl;
       return ret;
@@ -451,7 +451,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
     }
   }
 
-  void send_ready(const rgw_rest_obj& rest_obj) override {
+  void send_ready(const DoutPrefixProvider *dpp, const rgw_rest_obj& rest_obj) override {
     RGWRESTStreamS3PutObj *r = static_cast<RGWRESTStreamS3PutObj *>(req);
 
     map<string, string> new_attrs;
@@ -463,7 +463,7 @@ class RGWLCStreamPutCRF : public RGWStreamWriteHTTPResourceCRF
 
     RGWAccessControlPolicy policy;
 
-    r->send_ready(conn->get_key(), new_attrs, policy);
+    r->send_ready(dpp, conn->get_key(), new_attrs, policy);
   }
 
   void handle_headers(const map<string, string>& headers) {
@@ -507,7 +507,7 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
                          tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
                          tier_ctx.target_storage_class){}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) {
 
     reenter(this) {
       b.bucket.name = tier_ctx.target_bucket_name;
@@ -534,7 +534,7 @@ class RGWLCStreamObjToCloudPlainCR : public RGWCoroutine {
     //  tier_ctx.obj.set_atomic(&tier_ctx.rctx); -- might need when updated to zipper SAL
 
       /* Prepare Read from source */
-      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, tier_ctx.dpp,
+      in_crf.reset(new RGWLCStreamReadCRF(tier_ctx.cct, dpp,
                    tier_ctx.rctx, tier_ctx.obj, tier_ctx.o.meta.mtime));
 
       out_crf.reset(new RGWLCStreamPutCRF((CephContext *)(tier_ctx.cct), get_env(), this,
@@ -581,7 +581,7 @@ class RGWLCStreamObjToCloudMultipartPartCR : public RGWCoroutine {
                          tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
                          tier_ctx.target_storage_class){}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
       b.bucket.name = tier_ctx.target_bucket_name;
       target_obj_name = tier_ctx.bucket_info.bucket.name + "/" +
@@ -652,7 +652,7 @@ class RGWLCAbortMultipartCR : public RGWCoroutine {
                         dest_conn(_dest_conn), dest_obj(_dest_obj),
                         upload_id(_upload_id) {}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
 
       yield {
@@ -708,7 +708,7 @@ class RGWLCInitMultipartCR : public RGWCoroutine {
                        dest_obj(_dest_obj), obj_size(_obj_size),
                        attrs(_attrs), upload_id(_upload_id) {}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
 
       yield {
@@ -807,7 +807,7 @@ class RGWLCCompleteMultipartCR : public RGWCoroutine {
                            dest_conn(_dest_conn), dest_obj(_dest_obj), upload_id(_upload_id),
                            req_enc(_parts) {}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
 
       yield {
@@ -882,7 +882,7 @@ class RGWLCStreamAbortMultipartUploadCR : public RGWCoroutine {
                                     tier_ctx(_tier_ctx), dest_obj(_dest_obj), status_obj(_status_obj),
                                     upload_id(_upload_id) {}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
       yield call(new RGWLCAbortMultipartCR(tier_ctx.cct, tier_ctx.http_manager, tier_ctx.conn.get(), dest_obj, upload_id));
       if (retcode < 0) {
@@ -931,7 +931,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
                          tier_ctx.o.versioned_epoch, tier_ctx.acl_mappings,
                          tier_ctx.target_storage_class){}
 
-  int operate() override {
+  int operate(const DoutPrefixProvider *dpp) override {
     reenter(this) {
 
       obj_size = tier_ctx.o.meta.size;
@@ -955,7 +955,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
         return -1;
       }
 
-      yield call(new RGWSimpleRadosReadCR<rgw_lc_multipart_upload_info>(rados->svc()->rados->get_async_processor(), rados->svc()->sysobj,
+      yield call(new RGWSimpleRadosReadCR<rgw_lc_multipart_upload_info>(dpp, rados->svc()->rados->get_async_processor(), rados->svc()->sysobj,
                                                                  status_obj, &status, false));
 
       if (retcode < 0 && retcode != -ENOENT) {
@@ -1025,7 +1025,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
           return set_cr_error(retcode);
         }
 
-      yield call(new RGWSimpleRadosWriteCR<rgw_lc_multipart_upload_info>(rados->svc()->rados->get_async_processor(), rados->svc()->sysobj, status_obj, status));
+      yield call(new RGWSimpleRadosWriteCR<rgw_lc_multipart_upload_info>(dpp, rados->svc()->rados->get_async_processor(), rados->svc()->sysobj, status_obj, status));
 
         if (retcode < 0) {
           ldout(tier_ctx.cct, 0) << "ERROR: failed to store multipart upload state, retcode=" << retcode << dendl;
@@ -1053,7 +1053,7 @@ class RGWLCStreamObjToCloudMultipartCR : public RGWCoroutine {
   }
 };
 
-int RGWLCCloudCheckCR::operate() {
+int RGWLCCloudCheckCR::operate(const DoutPrefixProvider *dpp) {
   /* Check if object has already been transitioned */
   reenter(this) {
     b.bucket.name = tier_ctx.target_bucket_name;
@@ -1082,7 +1082,7 @@ int RGWLCCloudCheckCR::operate() {
      * before calling is_already_tiered() below
      */
     yield {
-    retcode = get_crf->init();
+    retcode = get_crf->init(dpp);
       if (retcode < 0) {
         ldout(tier_ctx.cct, 0) << "ERROR: failed to fetch HEAD from cloud for obj=" << tier_ctx.obj << " , retcode = " << retcode << dendl;
         return set_cr_error(ret);
@@ -1107,7 +1107,7 @@ int RGWLCCloudCheckCR::operate() {
 
 map <pair<string, string>, utime_t> target_buckets;
 
-int RGWLCCloudTierCR::operate() {
+int RGWLCCloudTierCR::operate(const DoutPrefixProvider *dpp) {
   pair<string, string> key(tier_ctx.storage_class, tier_ctx.target_bucket_name);
   bool bucket_created = false;
 

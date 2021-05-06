@@ -357,7 +357,7 @@ RGWStreamWriteCR::RGWStreamWriteCR(CephContext *_cct, RGWHTTPManager *_mgr,
                            in_crf(_in_crf), out_crf(_out_crf) {}
 RGWStreamWriteCR::~RGWStreamWriteCR() { }
 
-int RGWStreamWriteCR::operate() {
+int RGWStreamWriteCR::operate(const DoutPrefixProvider *dpp) {
   reenter(this) {
     ret = in_crf->init();
     if (ret < 0) {
@@ -394,7 +394,7 @@ int RGWStreamWriteCR::operate() {
           return set_cr_error(ret);
         }
               
-        out_crf->send_ready(rest_obj);
+        out_crf->send_ready(dpp, rest_obj);
         ret = out_crf->send();
         if (ret < 0) {
           return set_cr_error(ret);
