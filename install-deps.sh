@@ -13,6 +13,7 @@
 #  version 2.1 of the License, or (at your option) any later version.
 #
 set -e
+set -x
 DIR=/tmp/install-deps.$$
 trap "rm -fr $DIR" EXIT
 mkdir -p $DIR
@@ -394,18 +395,19 @@ else
 		    $SUDO dnf -y install --nogpgcheck https://dl.fedoraproject.org/pub/epel/epel-release-latest-$MAJOR_VERSION.noarch.rpm
                 $SUDO rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-$MAJOR_VERSION
                 $SUDO rm -f /etc/yum.repos.d/dl.fedoraproject.org*
+		install_arrow_parquet_on_centos8
 		if test $ID = centos -a $MAJOR_VERSION = 8 ; then
                     # Enable 'powertools' or 'PowerTools' repo
                     $SUDO dnf config-manager --set-enabled $(dnf repolist --all 2>/dev/null|gawk 'tolower($0) ~ /^powertools\s/{print $1}')
 		    # before EPEL8 and PowerTools provide all dependencies, we use sepia for the dependencies
                     $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
                     $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
-		    install_arrow_parquet_on_centos8
+		    #install_arrow_parquet_on_centos8
                 elif test $ID = rhel -a $MAJOR_VERSION = 8 ; then
                     $SUDO dnf config-manager --set-enabled "codeready-builder-for-rhel-8-${ARCH}-rpms"
 		    $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
 		    $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
-		    install_arrow_parquet_on_centos8
+		    #install_arrow_parquet_on_centos8
                 fi
                 ;;
         esac
