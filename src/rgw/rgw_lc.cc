@@ -239,43 +239,6 @@ void *RGWLC::LCWorker::entry() {
   return NULL;
 }
 
-int RGWLC::LCWorker::start_http_manager(rgw::sal::Store* store) {
-  int ret = 0;
-
-  if (is_http_mgr_started)
-    return 0;
-
-  /* http_mngr */
-  crs.reset(new RGWCoroutinesManager(store->ctx(), store->get_cr_registry()));
-
-  http_manager.reset(new RGWHTTPManager(store->ctx(), crs.get()->get_completion_mgr()));
-
-  ret = http_manager->start();
-  if (ret < 0) {
-    dout(5) << "RGWLC:: http_manager->start() failed ret = "
-	  << ret << dendl;
-    return ret;
-  }
-
-  is_http_mgr_started = true;
-  return ret;
-}
-
-int RGWLC::LCWorker::stop_http_manager() {
-  if (!is_http_mgr_started) {
-    return 0;
-  }
-
-  if (http_manager)
-    http_manager->stop();
-
-  http_manager.reset();
-  crs.reset();
-  
-  is_http_mgr_started = false;
-  return 0;
-}
-
 void RGWLC::initialize(CephContext *_cct, rgw::sal::Store* _store) {
   cct = _cct;
   store = _store;
@@ -718,6 +681,7 @@ public:
   static constexpr uint32_t FLAG_EWAIT_SYNC =  0x0001;
   static constexpr uint32_t FLAG_DWAIT_SYNC =  0x0002;
   static constexpr uint32_t FLAG_EDRAIN_SYNC = 0x0004;
+  static constexpr uint32_t FLAG_HTTP_MGR = 0x0008;
 
 private:
   const work_f bsf = [](RGWLC::LCWorker* wk, WorkQ* wq, WorkItem& wi) {};
@@ -729,6 +693,9 @@ private:
   uint32_t flags;
   vector<WorkItem> items;
   work_f f;
+  std::shared_ptr<RGWCoroutinesManager> crs;
+  std::shared_ptr<RGWHTTPManager> http_manager;
+  bool is_http_mgr_started{false};
 
 public:
   WorkQ(RGWLC::LCWorker* wk, uint32_t ix, uint32_t qmax)
@@ -744,6 +711,48 @@ public:
 
   void setf(work_f _f) {
     f = _f;
+  }
+
+  RGWCoroutinesManager* get_crs() { return crs.get(); }
+  RGWHTTPManager* get_http_manager() { return http_manager.get(); }
+
+  int start_http_manager(rgw::sal::Store* store) {
+    int ret = 0;
+
+    if (is_http_mgr_started)
+      return 0;
+
+    /* http_mngr */
+    if(!crs) {
+      crs.reset(new RGWCoroutinesManager(store->ctx(), store->get_cr_registry()));
+    }
+    if (!http_manager) {
+      http_manager.reset(new RGWHTTPManager(store->ctx(), crs.get()->get_completion_mgr()));
+    }      
+
+    ret = http_manager->start();
+    if (ret < 0) {
+      dout(5) << "RGWLC:: http_manager->start() failed ret = "
+	          << ret << dendl;
+      return ret;
+    }
+
+    is_http_mgr_started = true;
+    flags |= FLAG_HTTP_MGR;
+
+    return ret;
+  }
+
+  int stop_http_manager() {
+    if (!is_http_mgr_started) {
+      return 0;
+    }
+
+    http_manager.reset();
+    crs.reset();
+  
+    is_http_mgr_started = false;
+    return 0;
   }
 
   void enqueue(WorkItem&& item) {
@@ -776,6 +785,10 @@ private:
       /* clear drain state, as we are NOT doing work and qlen==0 */
       if (flags & FLAG_EDRAIN_SYNC) {
 	flags &= ~FLAG_EDRAIN_SYNC;
+      }
+      if (flags & FLAG_HTTP_MGR) {
+	flags &= ~FLAG_HTTP_MGR;
+    stop_http_manager();
       }
       flags |= FLAG_DWAIT_SYNC;
       cv.wait_for(uniq, 200ms);
@@ -1445,14 +1458,14 @@ public:
 
     conn.reset(new S3RESTConn(oc.cct, oc.store, id, { endpoint }, key, region, host_style));
 
-    int ret = oc.env.worker->start_http_manager(oc.store);
+    int ret = oc.wq->start_http_manager(oc.store);
     if (ret < 0) {
       ldpp_dout(oc.dpp, 0) << "failed in start_http_manager() ret=" << ret << dendl;
       return ret;
     }
 
-    RGWCoroutinesManager *crs = oc.env.worker->get_crs();
-    RGWHTTPManager *http_manager = oc.env.worker->get_http_manager();
+    RGWCoroutinesManager *crs = oc.wq->get_crs();
+    RGWHTTPManager *http_manager = oc.wq->get_http_manager();
 
     if (!crs || !http_manager) {
       /* maybe race..return and retry */
@@ -1489,6 +1502,7 @@ public:
          
     if (ret < 0) {
       ldpp_dout(oc.dpp, 0) << "ERROR: failed in RGWCloudTierCR() ret=" << ret << dendl;
+      return ret;
     }
 
     if (delete_object) {
@@ -1876,7 +1890,6 @@ int RGWLC::bucket_lc_post(int index, int max_lock_sec,
       sleep(5);
       continue;
     }
-    worker->stop_http_manager();
 
     if (ret < 0)
       return 0;
@@ -2151,7 +2164,6 @@ void RGWLC::LCWorker::stop()
 {
   std::lock_guard l{lock};
   cond.notify_all();
-  stop_http_manager();
 }
 
 bool RGWLC::going_down()

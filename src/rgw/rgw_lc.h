@@ -481,9 +481,6 @@ public:
     std::mutex lock;
     std::condition_variable cond;
     WorkPool* workpool{nullptr};
-    std::shared_ptr<RGWCoroutinesManager> crs;
-    std::shared_ptr<RGWHTTPManager> http_manager;
-    bool is_http_mgr_started{false};
 
   public:
 
@@ -497,10 +494,6 @@ public:
     void stop();
     bool should_work(utime_t& now);
     int schedule_next_start_time(utime_t& start, utime_t& now);
-    RGWCoroutinesManager *get_crs() const { return crs.get(); }
-    RGWHTTPManager *get_http_manager() const { return http_manager.get(); }
-    int start_http_manager(rgw::sal::Store* store);
-    int stop_http_manager();
     ~LCWorker();
 
     friend class RGWRados;
