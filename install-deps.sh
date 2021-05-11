@@ -23,6 +23,7 @@ fi
 export LC_ALL=C # the following is vulnerable to i18n
 
 ARCH=$(uname -m)
+echo "5.===== arrow -parquet ======="
 
 function munge_ceph_spec_in {
     local with_seastar=$1
@@ -327,6 +328,7 @@ else
     [ $WITH_JAEGER ] && with_jaeger=true || with_jaeger=false
     [ $WITH_ZBD ] && with_zbd=true || with_zbd=false
     [ $WITH_PMEM ] && with_pmem=true || with_pmem=false
+    echo "6.===== arrow -parquet ======="
     source /etc/os-release
     case "$ID" in
     debian|ubuntu|devuan|elementary)
@@ -382,6 +384,7 @@ else
 	if [ "$control" != "debian/control" ] ; then rm $control; fi
         ;;
     centos|fedora|rhel|ol|virtuozzo)
+	echo "7.===== arrow -parquet ======="
         builddepcmd="dnf -y builddep --allowerasing"
         echo "Using dnf to install dependencies"
         echo "1.===== arrow -parquet ======="
@@ -422,6 +425,7 @@ else
                 fi
                 ;;
         esac
+	echo "8.===== arrow -parquet ======="
         munge_ceph_spec_in $with_seastar $with_zbd $for_make_check $DIR/ceph.spec
         # for python3_pkgversion macro defined by python-srpm-macros, which is required by python3-devel
         $SUDO dnf install -y python3-devel
