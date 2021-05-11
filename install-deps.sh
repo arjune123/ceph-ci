@@ -384,11 +384,13 @@ else
     centos|fedora|rhel|ol|virtuozzo)
         builddepcmd="dnf -y builddep --allowerasing"
         echo "Using dnf to install dependencies"
+        echo "1.===== arrow -parquet ======="
         case "$ID" in
             fedora)
                 $SUDO dnf install -y dnf-utils
                 ;;
             centos|rhel|ol|virtuozzo)
+		echo "2.===== arrow -parquet ======="
                 MAJOR_VERSION="$(echo $VERSION_ID | cut -d. -f1)"
                 $SUDO dnf install -y dnf-utils
                 rpm --quiet --query epel-release || \
@@ -397,6 +399,7 @@ else
                 $SUDO rm -f /etc/yum.repos.d/dl.fedoraproject.org*
 		#install_arrow_parquet_on_centos8
 		if test $ID = centos -a $MAJOR_VERSION = 8 ; then
+		    echo "3.===== arrow -parquet ======="
                     # Enable 'powertools' or 'PowerTools' repo
                     $SUDO dnf config-manager --set-enabled $(dnf repolist --all 2>/dev/null|gawk 'tolower($0) ~ /^powertools\s/{print $1}')
 		    # before EPEL8 and PowerTools provide all dependencies, we use sepia for the dependencies
@@ -408,6 +411,7 @@ else
 		    #install_arrow_parquet_on_centos8
 
                 elif test $ID = rhel -a $MAJOR_VERSION = 8 ; then
+		    echo "4.===== arrow -parquet ======="
                     $SUDO dnf config-manager --set-enabled "codeready-builder-for-rhel-8-${ARCH}-rpms"
 		    $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
 		    $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
