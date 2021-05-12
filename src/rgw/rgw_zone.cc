@@ -1970,7 +1970,7 @@ void RGWZoneGroupMap::decode(bufferlist::const_iterator& bl) {
   }
 }
 
-static int conf_to_uint64(const JSONFormattable& config, const string& key, uint64_t *pval)
+static inline int conf_to_uint64(const JSONFormattable& config, const string& key, uint64_t *pval)
 {
   string sval;
   if (config.find(key, &sval)) {

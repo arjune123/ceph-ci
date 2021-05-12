@@ -684,6 +684,15 @@ public:
   static constexpr uint32_t FLAG_HTTP_MGR = 0x0008;
 
 private:
+  class C_WorkQTimerCtx: public Context {
+    WorkQ* wq;
+    public:
+      C_WorkQTimerCtx(WorkQ* _wq): wq(_wq) {}
+      void finish(int r) override {
+        wq->stop_http_manager();
+      }
+  };
+
   const work_f bsf = [](RGWLC::LCWorker* wk, WorkQ* wq, WorkItem& wi) {};
   RGWLC::LCWorker* wk;
   uint32_t qmax;
@@ -693,16 +702,27 @@ private:
   uint32_t flags;
   vector<WorkItem> items;
   work_f f;
-  std::shared_ptr<RGWCoroutinesManager> crs;
-  std::shared_ptr<RGWHTTPManager> http_manager;
+  std::unique_ptr<RGWCoroutinesManager> crs;
+  std::unique_ptr<RGWHTTPManager> http_manager;
   bool is_http_mgr_started{false};
+  ceph::mutex timer_mtx;
+  SafeTimer timer;
+  int timer_wait_sec = 200; //seconds
+  C_WorkQTimerCtx* timer_ctx = nullptr;
 
 public:
   WorkQ(RGWLC::LCWorker* wk, uint32_t ix, uint32_t qmax)
-    : wk(wk), qmax(qmax), ix(ix), flags(FLAG_NONE), f(bsf)
+    : wk(wk), qmax(qmax), ix(ix), flags(FLAG_NONE), f(bsf),
+      timer_mtx(ceph::make_mutex("WorkQTimerMutex")),
+      timer((CephContext*)(wk->cct), timer_mtx)
     {
       create(thr_name().c_str());
+      timer.init();
     }
+
+  ~WorkQ() {
+    timer.shutdown();
+  }
 
   std::string thr_name() {
     return std::string{"wp_thrd: "}
@@ -752,6 +772,9 @@ public:
     crs.reset();
   
     is_http_mgr_started = false;
+	flags &= ~FLAG_HTTP_MGR;
+    timer.cancel_all_events();
+    timer_ctx = nullptr;
     return 0;
   }
 
@@ -761,6 +784,10 @@ public:
 	   (items.size() > qmax)) {
       flags |= FLAG_EWAIT_SYNC;
       cv.wait_for(uniq, 200ms);
+    }
+    if (timer_ctx && (flags & FLAG_HTTP_MGR)) {
+      timer.cancel_all_events();
+      timer_ctx = nullptr;
     }
     items.push_back(item);
     if (flags & FLAG_DWAIT_SYNC) {
@@ -786,9 +813,9 @@ private:
       if (flags & FLAG_EDRAIN_SYNC) {
 	flags &= ~FLAG_EDRAIN_SYNC;
       }
-      if (flags & FLAG_HTTP_MGR) {
-	flags &= ~FLAG_HTTP_MGR;
-    stop_http_manager();
+      if ((flags & FLAG_HTTP_MGR) && !timer_ctx) {
+        timer_ctx = new C_WorkQTimerCtx(this);
+        timer.add_event_after(timer_wait_sec, timer_ctx);
       }
       flags |= FLAG_DWAIT_SYNC;
       cv.wait_for(uniq, 200ms);
@@ -1405,7 +1432,6 @@ public:
      * obj_size remains the same even when object is moved to other
      * storage class. So maybe better to keep it the same way.
      */
-    //pmanifest->set_obj_size(0);
 
     obj_op->params.manifest = pmanifest;
 
@@ -1464,8 +1490,8 @@ public:
       return ret;
     }
 
-    RGWCoroutinesManager *crs = oc.wq->get_crs();
-    RGWHTTPManager *http_manager = oc.wq->get_http_manager();
+    RGWCoroutinesManager* crs = oc.wq->get_crs();
+    RGWHTTPManager* http_manager = oc.wq->get_http_manager();
 
     if (!crs || !http_manager) {
       /* maybe race..return and retry */

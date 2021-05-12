@@ -26,7 +26,7 @@
 
 using namespace std;
 
-static string get_key_instance(const rgw_obj_key& key)
+static inline string get_key_instance(const rgw_obj_key& key)
 {
   if (!key.instance.empty() &&
       !key.have_null_instance()) {
@@ -35,7 +35,7 @@ static string get_key_instance(const rgw_obj_key& key)
   return "";
 }
 
-static string get_key_oid(const rgw_obj_key& key)
+static inline string get_key_oid(const rgw_obj_key& key)
 {
   string oid = key.name;
   if (!key.instance.empty() &&
@@ -45,7 +45,7 @@ static string get_key_oid(const rgw_obj_key& key)
   return oid;
 }
 
-static string obj_to_aws_path(const rgw_obj& obj)
+static inline string obj_to_aws_path(const rgw_obj& obj)
 {
   string path = obj.bucket.name + "/" + get_key_oid(obj.key);
   return path;

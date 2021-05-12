@@ -351,13 +351,13 @@ RGWStreamReadCRF::RGWStreamReadCRF(std::unique_ptr<rgw::sal::Object>* obj,
              RGWObjectCtx& obj_ctx) : read_op((*obj)->get_read_op(&obj_ctx)) {}
 RGWStreamReadCRF::~RGWStreamReadCRF() {}
 
-RGWStreamWriteCR::RGWStreamWriteCR(CephContext *_cct, RGWHTTPManager *_mgr,
+RGWStreamWriteCR::RGWStreamWriteCR(CephContext* _cct, RGWHTTPManager* _mgr,
                            shared_ptr<RGWStreamReadCRF>& _in_crf,
                            shared_ptr<RGWStreamWriteHTTPResourceCRF>& _out_crf) : RGWCoroutine(_cct), cct(_cct), http_manager(_mgr),
                            in_crf(_in_crf), out_crf(_out_crf) {}
 RGWStreamWriteCR::~RGWStreamWriteCR() { }
 
-int RGWStreamWriteCR::operate(const DoutPrefixProvider *dpp) {
+int RGWStreamWriteCR::operate(const DoutPrefixProvider* dpp) {
   reenter(this) {
     ret = in_crf->init();
     if (ret < 0) {
