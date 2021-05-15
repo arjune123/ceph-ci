@@ -12,7 +12,6 @@
 #  License as published by the Free Software Foundation; either
 #  version 2.1 of the License, or (at your option) any later version.
 #
-exit 
 set -e
 set -x
 DIR=/tmp/install-deps.$$
