@@ -13,7 +13,6 @@
 #  version 2.1 of the License, or (at your option) any later version.
 #
 set -e
-set -x
 DIR=/tmp/install-deps.$$
 trap "rm -fr $DIR" EXIT
 mkdir -p $DIR
@@ -23,7 +22,6 @@ fi
 export LC_ALL=C # the following is vulnerable to i18n
 
 ARCH=$(uname -m)
-echo "5.===== arrow -parquet ======="
 
 function munge_ceph_spec_in {
     local with_seastar=$1
@@ -328,7 +326,6 @@ else
     [ $WITH_JAEGER ] && with_jaeger=true || with_jaeger=false
     [ $WITH_ZBD ] && with_zbd=true || with_zbd=false
     [ $WITH_PMEM ] && with_pmem=true || with_pmem=false
-    echo "6.===== arrow -parquet ======="
     source /etc/os-release
     case "$ID" in
     debian|ubuntu|devuan|elementary)
@@ -384,46 +381,36 @@ else
 	if [ "$control" != "debian/control" ] ; then rm $control; fi
         ;;
     centos|fedora|rhel|ol|virtuozzo)
-	echo "7.===== arrow -parquet ======="
         builddepcmd="dnf -y builddep --allowerasing"
         echo "Using dnf to install dependencies"
-        echo "1.===== arrow -parquet ======="
         case "$ID" in
             fedora)
                 $SUDO dnf install -y dnf-utils
                 ;;
             centos|rhel|ol|virtuozzo)
-		echo "2.===== arrow -parquet ======="
                 MAJOR_VERSION="$(echo $VERSION_ID | cut -d. -f1)"
                 $SUDO dnf install -y dnf-utils
                 rpm --quiet --query epel-release || \
 		    $SUDO dnf -y install --nogpgcheck https://dl.fedoraproject.org/pub/epel/epel-release-latest-$MAJOR_VERSION.noarch.rpm
                 $SUDO rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-$MAJOR_VERSION
                 $SUDO rm -f /etc/yum.repos.d/dl.fedoraproject.org*
-		#install_arrow_parquet_on_centos8
 		if test $ID = centos -a $MAJOR_VERSION = 8 ; then
-		    echo "3.===== arrow -parquet ======="
                     # Enable 'powertools' or 'PowerTools' repo
                     $SUDO dnf config-manager --set-enabled $(dnf repolist --all 2>/dev/null|gawk 'tolower($0) ~ /^powertools\s/{print $1}')
 		    # before EPEL8 and PowerTools provide all dependencies, we use sepia for the dependencies
                     $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
                     $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
 
-		    $SUDO dnf install -y https://apache.bintray.com/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm
-		    #install_arrow_parquet_on_centos8
-
+		    install_arrow_parquet_on_centos8
                 elif test $ID = rhel -a $MAJOR_VERSION = 8 ; then
-		    echo "4.===== arrow -parquet ======="
                     $SUDO dnf config-manager --set-enabled "codeready-builder-for-rhel-8-${ARCH}-rpms"
 		    $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
 		    $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
 
-		    $SUDO dnf install -y https://apache.bintray.com/arrow/centos/$(cut -d: -f5 /etc/system-release-cpe | cut -d. -f1)/apache-arrow-release-latest.rpm
-		    #install_arrow_parquet_on_centos8
+		    install_arrow_parquet_on_centos8
                 fi
                 ;;
         esac
-	echo "8.===== arrow -parquet ======="
         munge_ceph_spec_in $with_seastar $with_zbd $for_make_check $DIR/ceph.spec
         # for python3_pkgversion macro defined by python-srpm-macros, which is required by python3-devel
         $SUDO dnf install -y python3-devel
