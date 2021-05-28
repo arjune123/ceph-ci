@@ -76,6 +76,7 @@ Build-Depends: automake,
                libxmlsec1-openssl <pkg.ceph.check>,
                libxmlsec1-dev <pkg.ceph.check>,
                libyaml-cpp-dev <pkg.ceph.crimson>,
+# rgw/s3select(apache/parquet) 
 	       libarrow-dev,
                libparquet-dev,
                lsb-release,
