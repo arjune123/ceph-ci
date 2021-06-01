@@ -247,10 +247,7 @@ function install_arrow_parquet_on_debian()
   $SUDO apt install -y -V ca-certificates lsb-release wget
   wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-archive-keyring-latest-$(lsb_release --codename --short).deb
   $SUDO apt install -y -V ./apache-arrow-archive-keyring-latest-$(lsb_release --codename --short).deb
-  $SUDO sed -i'' -e 's,https://apache.bintray.com/,https://apache.jfrog.io/artifactory/,g' /etc/apt/sources.list.d/apache-arrow.sources 
   $SUDO apt update
-  $SUDO apt install -y -V libarrow-dev
-  $SUDO apt install -y -V libparquet-dev
 }
 
 for_make_check=false
@@ -402,6 +399,7 @@ else
                     $SUDO dnf config-manager --setopt=apt-mirror.front.sepia.ceph.com_lab-extras_8_.gpgcheck=0 --save
 
 		    install_arrow_parquet_on_centos8
+
                 elif test $ID = rhel -a $MAJOR_VERSION = 8 ; then
                     $SUDO dnf config-manager --set-enabled "codeready-builder-for-rhel-8-${ARCH}-rpms"
 		    $SUDO dnf config-manager --add-repo http://apt-mirror.front.sepia.ceph.com/lab-extras/8/
