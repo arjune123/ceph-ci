@@ -22,6 +22,9 @@ fi
 export LC_ALL=C # the following is vulnerable to i18n
 #add this to ceph-build or remove all temporary mangling
 export WITH_JAEGER=true
+WITH_JAEGER=true
+
+echo "WITH_JAEGER" $WITH_JAEGER
 
 ARCH=$(uname -m)
 
@@ -72,7 +75,6 @@ function munge_debian_control {
     fi
     if $with_jaeger; then
 	sed -i -e 's/^# Jaeger[[:space:]]//g' $control
-	sed -i -e 's/^# Crimson      libyaml-cpp-dev,/d' $control
     fi
     if $for_make_check; then
         sed -i 's/^# Make-Check[[:space:]]/             /g' $control
