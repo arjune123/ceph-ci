@@ -76,12 +76,14 @@ seastar::future<> ClientRequest::start()
       logger().debug("{}: in repeat", *this);
       return with_blocking_future(handle.enter(cp().await_map))
       .then([this]() {
+        logger().debug("{} entered await_map:{}", *this, __LINE__);
 	return with_blocking_future(
 	    osd.osdmap_gate.wait_for_map(
 	      m->get_min_epoch()));
       }).then([this](epoch_t epoch) {
 	return with_blocking_future(handle.enter(cp().get_pg));
       }).then([this] {
+        logger().debug("{} entered get_pg", *this);
 	return with_blocking_future(osd.wait_for_pg(m->get_spg()));
       }).then([this](Ref<PG> pgref) mutable {
 	return interruptor::with_interruption([this, pgref]() mutable {
@@ -100,12 +102,14 @@ seastar::future<> ClientRequest::start()
               return with_blocking_future_interruptible<IOInterruptCondition>(
                 handle.enter(pp(pg).await_map)
               ).then_interruptible([this, &pg] {
+                logger().debug("{} entered await_map", *this);
                 return with_blocking_future_interruptible<IOInterruptCondition>(
                     pg.osdmap_gate.wait_for_map(m->get_min_epoch()));
               }).then_interruptible([this, &pg](auto map) {
                 return with_blocking_future_interruptible<IOInterruptCondition>(
                     handle.enter(pp(pg).wait_for_active));
               }).then_interruptible([this, &pg]() {
+                logger().debug("{} entered wait_for_active", *this);
                 return with_blocking_future_interruptible<IOInterruptCondition>(
                     pg.wait_for_active_blocker.wait());
               }).then_interruptible([this, pgref=std::move(pgref)]() mutable {
@@ -152,6 +156,7 @@ ClientRequest::process_op(Ref<PG> &pg)
       handle.enter(pp(*pg).recover_missing))
   .then_interruptible(
     [this, pg]() mutable {
+    logger().debug("{} entered recover_missing", *this);
     return do_recover_missing(pg, m->get_hobj());
   }).then_interruptible([this, pg]() mutable {
     return pg->already_complete(m->get_reqid()).then_unpack_interruptible(
@@ -173,6 +178,7 @@ ClientRequest::process_op(Ref<PG> &pg)
             return with_blocking_future_interruptible<IOInterruptCondition>(
               handle.enter(pp(*pg).process)
             ).then_interruptible([this, pg, obc]() mutable {
+              logger().debug("{} entered process", *this);
               return do_process(pg, obc);
             });
           });
@@ -193,7 +199,7 @@ ClientRequest::do_process(Ref<PG>& pg, crimson::osd::ObjectContextRef obc)
   if (!pg->is_primary()) {
     // primary can handle both normal ops and balanced reads
     if (is_misdirected(*pg)) {
-      logger().trace("do_process: dropping misdirected op");
+      logger().debug("{} do_process: doropping misdirected op", *this);
       return seastar::now();
     } else if (const hobject_t& hoid = m->get_hobj();
                !pg->get_peering_state().can_serve_replica_read(hoid)) {
@@ -212,18 +218,22 @@ ClientRequest::do_process(Ref<PG>& pg, crimson::osd::ObjectContextRef obc)
             handle.enter(pp(*pg).wait_repop));
     }).then_interruptible(
       [this, pg, all_completed=std::move(all_completed)]() mutable {
+      logger().debug("{} entered wait_repop", *this);
       return all_completed.safe_then_interruptible(
         [this, pg](Ref<MOSDOpReply> reply) {
         return with_blocking_future_interruptible<IOInterruptCondition>(
             handle.enter(pp(*pg).send_reply)).then_interruptible(
               [this, reply=std::move(reply)] {
+              logger().debug("{} entered send_reply", *this);
               return conn->send(std::move(reply));
             });
       }, crimson::ct_error::eagain::handle([this, pg]() mutable {
+        logger().debug("{} do_process:{}: handling eagain", *this, __LINE__);
         return process_op(pg);
       }));
     });
   }, crimson::ct_error::eagain::handle([this, pg]() mutable {
+    logger().debug("{} do_process:{}: handling eagain", *this, __LINE__);
     return process_op(pg);
   }));
 }
