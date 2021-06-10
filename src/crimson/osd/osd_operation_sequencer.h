@@ -38,6 +38,9 @@ public:
     const uint64_t this_op = op.get_id();
     auto have_green_light = seastar::make_ready_future<>();
     assert(prev_op < this_op);
+    ::crimson::get_logger(ceph_subsys_osd).debug(
+      "OpSequencer::start_op: prev_op={} this_op={} last_unblocked={} last_issued={}",
+      prev_op, this_op, last_unblocked, last_issued);
     if (last_issued == prev_op) {
       // starting a new op, let's advance the last_issued!
       last_issued = this_op;
@@ -74,6 +77,9 @@ public:
   }
   template <class OpT>
   void finish_op(const OpT& op) {
+    ::crimson::get_logger(ceph_subsys_osd).debug(
+      "OpSequencer::finish_op: this_op={} last_completed={}",
+      op.get_id(), last_completed);
     assert(op.get_id() > last_completed);
     last_completed = op.get_id();
   }
@@ -90,6 +96,8 @@ public:
     }
   }
   void abort() {
+    ::crimson::get_logger(ceph_subsys_osd).debug(
+      "OpSequencer::abort");
     // all blocked ops should be canceled, likely due to the osd is not primary
     // anymore.
     unblocked.broken();
