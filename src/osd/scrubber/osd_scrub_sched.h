@@ -46,10 +46,10 @@ class ScrubQueue {
   enum class must_scrub_t { not_mandatory, mandatory };
 
   enum class qu_state_t {
-    created,	    // the scrubber and its scrub-job were just created
+    not_registered, // not a primary, thus not considered for scrubbing by this OSD (also
+		    // the temporary state when just created)
     registered,     // in either of the two queues ('to_scrub' or 'penalized')
     unregistering,  // in the process of being unregistered. Will be finalized under lock
-    not_registered, // not a primary, thus not considered for scrubbing by this OSD
     pg_deleted      // temporary state. Used when removing the PG.
   };
 
@@ -84,7 +84,7 @@ class ScrubQueue {
     /// the OSD id (for the log)
     int whoami;
 
-    std::atomic<qu_state_t> m_state{qu_state_t::created};
+    std::atomic<qu_state_t> m_state{qu_state_t::not_registered};
 
     /// the old 'is_registered'. Set whenever the job is registered with the OSD, i.e.
     /// is in either the 'to_scrub' or the 'penalized' vectors.

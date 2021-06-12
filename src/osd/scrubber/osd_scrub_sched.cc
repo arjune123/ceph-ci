@@ -72,11 +72,9 @@ std::optional<double> ScrubQueue::update_load_average()
 /*
  * The possibe scenarios regarding the job's state:
  *
- *   registered -> unregistering (will be changed to not-registered later on, under lock
+ *   registered -> unregistering (will be changed to not-registered later on, under lock)
  *
- * Will not modify (but are possible):
- *
- *  'created' (if we were never a Primary here
+ * Will not modify (but is possible):
  *  not_registered
  *
  * Should not appear, but are harmless (here):
@@ -92,16 +90,17 @@ void ScrubQueue::remove_from_osd_queue(ceph::ref_t<ScrubJob> scrub_job)
     scrub_job->m_state.compare_exchange_strong(expected_state, qu_state_t::unregistering);
   scrub_job->m_sched_time = {};	 // appearing in logs/asok
 
-  if (!ret && (expected_state != qu_state_t::created)) {
-    // job wasn't in state 'registered' (or 'created') coming in
+  if (!ret) {
+    // job wasn't in state 'registered' coming in
 
     dout(5) << " removing pg(" << scrub_job->pgid
 	    << ") failed. State was: " << qu_state_text(expected_state) << dendl;
-  }
+  } else {
 
-  dout(10) << " pg(" << scrub_job->pgid << ") sched-state changed from "
+    dout(10) << " pg(" << scrub_job->pgid << ") sched-state changed from "
 	   << qu_state_text(expected_state) << " to " << qu_state_text(scrub_job->m_state)
 	   << dendl;
+  }
 }
 
 // used upon scrubber/PG destruction
@@ -142,16 +141,13 @@ void ScrubQueue::register_with_osd(ceph::ref_t<ScrubJob> scrub_job,
     case qu_state_t::registered:
       // just updating the schedule?
       update_job(scrub_job, suggested);
-      scrub_job->m_updated = true;
       break;
 
 
     case qu_state_t::pg_deleted:
-      // RRR understand why the PG wasn't fully removed
       dout(5) << " Restoring a scrub job" << dendl;
       // fall through
 
-    case qu_state_t::created:
     case qu_state_t::not_registered:
       // insertion under lock
       {
@@ -159,6 +155,9 @@ void ScrubQueue::register_with_osd(ceph::ref_t<ScrubJob> scrub_job,
 	ceph_assert(l.owns_lock());
 	if (verif != scrub_job->m_state) {
 	  dout(5) << " scrub-job state changed" << dendl;
+	  // retry
+	  l.unlock();
+	  register_with_osd(scrub_job, suggested);
 	  break;
 	}
 
@@ -185,8 +184,6 @@ void ScrubQueue::register_with_osd(ceph::ref_t<ScrubJob> scrub_job,
 	scrub_job->m_in_queues = true;
 	scrub_job->m_state = qu_state_t::registered;
       }
-      break;
-
       break;
   }
 
@@ -286,10 +283,9 @@ string_view ScrubQueue::attempt_res_text(Scrub::attempt_t v)
 string_view ScrubQueue::qu_state_text(qu_state_t st)
 {
   switch (st) {
-    case qu_state_t::created: return "initializing"sv;
+    case qu_state_t::not_registered: return "not registered w/ OSD"sv;
     case qu_state_t::registered: return "registered"sv;
     case qu_state_t::unregistering: return "unregistering"sv;
-    case qu_state_t::not_registered: return "not registered w/ OSD"sv;
     case qu_state_t::pg_deleted: return "PG removed"sv;
   }
   // g++ (unlike CLANG), requires an extra 'return' here
