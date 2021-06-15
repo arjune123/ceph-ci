@@ -38,7 +38,7 @@ public:
     OrderedExclusivePhase await_map = {
       "ClientRequest::PGPipeline::await_map"
     };
-    OrderedExclusivePhase wait_repop = {
+    OrderedConcurrentPhase wait_repop = {
       "ClientRequest::PGPipeline::wait_repop"
     };
     OrderedExclusivePhase send_reply = {
