@@ -238,8 +238,6 @@ BuildRequires:	xfsprogs-devel
 BuildRequires:	xmlstarlet
 BuildRequires:	nasm
 BuildRequires:	lua-devel
-# TODO {?rhel} for version
-BuildRequires:  https://apache.jfrog.io/artifactory/arrow/centos/8/apache-arrow-release-latest.rpm
 BuildRequires:  arrow-devel
 BuildRequires:  arrow-glib-devel
 BuildRequires:  parquet-devel
