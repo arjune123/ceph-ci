@@ -11,6 +11,8 @@
 #include <boost/stacktrace.hpp>
 #include <seastar/core/reactor.hh>
 
+#include "common/Thread.h"
+
 FatalSignal::FatalSignal()
 {
   install_oneshot_signals_handler<SIGSEGV,
@@ -21,6 +23,25 @@ FatalSignal::FatalSignal()
                                   SIGXCPU,
                                   SIGXFSZ,
                                   SIGSYS>();
+}
+
+static void reraise_fatal(const int signum)
+{
+  // Use default handler to dump core
+  ::signal(signum, SIG_DFL);
+  int ret = ::raise(signum);
+
+  // Normally, we won't get here. If we do, something is very weird.
+  char buf[1024];
+  if (ret) {
+    snprintf(buf, sizeof(buf), "reraise_fatal: failed to re-raise "
+	    "signal %d\n", signum);
+  } else {
+    snprintf(buf, sizeof(buf), "reraise_fatal: default handler for "
+	    "signal %d didn't terminate the process?\n", signum);
+  }
+  std::cerr << buf << std::flush;
+  //::_exit(1);
 }
 
 template <int... SigNums>
@@ -34,14 +55,28 @@ void FatalSignal::install_oneshot_signal_handler()
 {
   struct sigaction sa;
   sa.sa_sigaction = [](int sig, siginfo_t *info, void *p) {
-    if (static std::atomic_bool handled{false}; handled.exchange(true)) {
+    constexpr static pid_t NULL_TID{0};
+    static std::atomic<pid_t> handler_tid{NULL_TID};
+    if (auto expected{NULL_TID};
+        !handler_tid.compare_exchange_strong(expected, ceph_gettid())) {
+      if (expected == ceph_gettid()) {
+        // The handler code may itself trigger a SIGSEGV if the heap is corrupt.
+        // In that case, SIG_DFL followed by return specifies that the default
+        // signal handler -- presumably dump core -- will handle it.
+        ::signal(SigNum, SIG_DFL);
+      } else {
+        // Huh, another thread got into troubles while we are handling the fault.
+        // If this is i.e. SIGSEGV handler, returning means retrying the faulty
+        // instruction one more time, and thus all those extra threads will run
+        // into a busy-wait basically.
+      }
       return;
     }
     FatalSignal::signaled(sig, info);
-    ::signal(sig, SIG_DFL);
+    reraise_fatal(sig);
   };
-  sigfillset(&sa.sa_mask);
-  sa.sa_flags = SA_SIGINFO | SA_RESTART;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_SIGINFO | SA_NODEFER;
   if constexpr (SigNum == SIGSEGV) {
     sa.sa_flags |= SA_ONSTACK;
   }
