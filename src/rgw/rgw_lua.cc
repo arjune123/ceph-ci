@@ -197,13 +197,11 @@ int install_packages(const DoutPrefixProvider *dpp, rgw::sal::Store* store, opti
   // the lua rocks install dir will be created by luarocks the first time it is called
   for (const auto& package : packages) {
     bp::ipstream is;
-    bp::child c(p, "install", "--lua-version", CEPH_LUA_VERSION, "--tree", luarocks_path, "--deps-mode", "one", package, 
-        bp::std_in.close(),
-        (bp::std_err & bp::std_out) > is);
+    const auto cmd = p.string() + " install --lua-version " + CEPH_LUA_VERSION + " --tree " + luarocks_path + " --deps-mode one " + package;
+    bp::child c(cmd, bp::std_in.close(), (bp::std_err & bp::std_out) > is);
 
     // once package reload is supported, code should yield when reading output
-    std::string line = "CMD: luarocks install --lua-version " + std::string(CEPH_LUA_VERSION) + std::string(" --tree ") + 
-      luarocks_path + " --deps-mode one " + package;
+    std::string line = std::string("CMD: ") + cmd;
 
     do {
       if (!line.empty()) {
