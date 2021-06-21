@@ -156,6 +156,7 @@ public:
           .then([packaged=std::move(packaged), shard, this] {
             auto task = new Task{std::move(packaged)};
             auto fut = task->get_future();
+            assert(shard < std::size(pending_queues));
 	    pending_queues[shard].push_back(task);
             return fut.finally([task, this] {
               local_free_slots().signal();
