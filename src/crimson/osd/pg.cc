@@ -678,6 +678,7 @@ PG::do_osd_ops_execute(
     logger().debug(
       "do_osd_ops_execute: object {} all operations successful",
       ox->get_target());
+    assert(this);
     return std::move(*ox).flush_changes_n_do_ops_effects(
       Ref<PG>{this},
       [this, &op_info, &ops] (auto&& txn,

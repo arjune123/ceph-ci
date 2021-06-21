@@ -68,7 +68,7 @@ seastar::future<> PeeringEvent::start()
       handle.exit();
       return complete_rctx(pg);
     } else {
-      logger().debug("{}: pg present", *this);
+      logger().debug("{}: pg present, pg={}, this={}", *this, (void*)pg.get(), (void*)this);
       return with_blocking_future(handle.enter(pp(*pg).await_map)
       ).then([this, pg] {
 	return with_blocking_future(
