@@ -822,21 +822,22 @@ static int request_key_from_barbican(CephContext *cct,
   return res;
 }
 
-static int get_actual_key_from_barbican(CephContext *cct,
+static int get_actual_key_from_barbican(const DoutPrefixProvider *dpp,
+                                        CephContext *cct,
                                         std::string_view key_id,
                                         std::string& actual_key)
 {
   int res = 0;
   std::string token;
 
-  if (rgw::keystone::Service::get_keystone_barbican_token(cct, token) < 0) {
-    ldout(cct, 5) << "Failed to retrieve token for Barbican" << dendl;
+  if (rgw::keystone::Service::get_keystone_barbican_token(dpp, cct, token) < 0) {
+    ldpp_dout(dpp, 5) << "Failed to retrieve token for Barbican" << dendl;
     return -EINVAL;
   }
 
   res = request_key_from_barbican(cct, key_id, token, actual_key);
   if (res != 0) {
-    ldout(cct, 5) << "Failed to retrieve secret from Barbican:" << key_id << dendl;
+    ldpp_dout(dpp, 5) << "Failed to retrieve secret from Barbican:" << key_id << dendl;
   }
   return res;
 }
@@ -942,18 +943,18 @@ static int get_actual_key_from_kmip(CephContext *cct,
 }
 
 
-int reconstitute_actual_key_from_kms(CephContext *cct,
+int reconstitute_actual_key_from_kms(const DoutPrefixProvider *dpp, CephContext *cct,
                             map<string, bufferlist>& attrs,
                             std::string& actual_key)
 {
   std::string key_id = get_str_attribute(attrs, RGW_ATTR_CRYPT_KEYID);
   std::string kms_backend { cct->_conf->rgw_crypt_s3_kms_backend };
 
-  ldout(cct, 20) << "Getting KMS encryption key for key " << key_id << dendl;
-  ldout(cct, 20) << "SSE-KMS backend is " << kms_backend << dendl;
+  ldpp_dout(dpp, 20) << "Getting KMS encryption key for key " << key_id << dendl;
+  ldpp_dout(dpp, 20) << "SSE-KMS backend is " << kms_backend << dendl;
 
   if (RGW_SSE_KMS_BACKEND_BARBICAN == kms_backend) {
-    return get_actual_key_from_barbican(cct, key_id, actual_key);
+    return get_actual_key_from_barbican(dpp, cct, key_id, actual_key);
   }
 
   if (RGW_SSE_KMS_BACKEND_VAULT == kms_backend) {
@@ -969,16 +970,16 @@ int reconstitute_actual_key_from_kms(CephContext *cct,
     return get_actual_key_from_conf(cct, key_id, key_selector, actual_key);
   }
 
-  ldout(cct, 0) << "ERROR: Invalid rgw_crypt_s3_kms_backend: " << kms_backend << dendl;
+  ldpp_dout(dpp, 0) << "ERROR: Invalid rgw_crypt_s3_kms_backend: " << kms_backend << dendl;
   return -EINVAL;
 }
 
-int make_actual_key_from_kms(CephContext *cct,
+int make_actual_key_from_kms(const DoutPrefixProvider *dpp, CephContext *cct,
                             map<string, bufferlist>& attrs,
                             std::string& actual_key)
 {
   std::string kms_backend { cct->_conf->rgw_crypt_s3_kms_backend };
   if (RGW_SSE_KMS_BACKEND_VAULT == kms_backend)
     return make_actual_key_from_vault(cct, attrs, actual_key);
-  return reconstitute_actual_key_from_kms(cct, attrs, actual_key);
+  return reconstitute_actual_key_from_kms(dpp, cct, attrs, actual_key);
 }
