@@ -73,7 +73,8 @@ void FatalSignal::install_oneshot_signal_handler()
       }
       return;
     }
-    FatalSignal::signaled(sig, info);
+    assert(info);
+    FatalSignal::signaled(sig, *info);
     reraise_fatal(sig);
   };
   sigemptyset(&sa.sa_mask);
@@ -98,9 +99,9 @@ static void print_backtrace(std::string_view cause) {
   //       see handle_fatal_signal()
 }
 
-static void print_segv_info(const siginfo_t* siginfo)
+static void print_segv_info(const siginfo_t& siginfo)
 {
-  std::cerr << "Fault at location: " << siginfo->si_addr << std::endl;
+  std::cerr << "Fault at location: " << siginfo.si_addr << std::endl;
   std::cerr << std::flush;
 }
 
@@ -127,7 +128,7 @@ static void print_proc_maps()
   }
 }
 
-void FatalSignal::signaled(const int signum, const siginfo_t* siginfo)
+void FatalSignal::signaled(const int signum, const siginfo_t& siginfo)
 {
   switch (signum) {
   case SIGSEGV:
