@@ -65,6 +65,7 @@ seastar::future<> InternalClientRequest::start()
                 [[maybe_unused]] const int ret = op_info.set_from_op(
                   std::as_const(osd_ops), pg->get_pgid().pgid, *pg->get_osdmap());
                 assert(ret == 0);
+                logger().debug("{}:{}", __func__, __LINE__);
                 return pg->with_locked_obc(get_target_oid(), op_info,
                   [&osd_ops, this](auto obc) {
                   return with_blocking_future_interruptible<IOInterruptCondition>(

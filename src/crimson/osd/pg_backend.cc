@@ -67,6 +67,7 @@ PGBackend::load_metadata_iertr::future
   <PGBackend::loaded_object_md_t::ref>
 PGBackend::load_metadata(const hobject_t& oid)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   if (__builtin_expect(stopping, false)) {
     throw crimson::common::system_shutdown_exception();
   }

@@ -664,6 +664,7 @@ PG::do_osd_ops_execute(
 {
   assert(ox);
   auto rollbacker = ox->create_rollbacker([this] (auto& obc) {
+    logger().debug("{}:{}", "rollbacker", __LINE__);
     return reload_obc(obc).handle_error_interruptible(
       load_obc_ertr::assert_all{"can't live with object state messed up"});
   });
@@ -924,6 +925,7 @@ template<RWState::State State>
 PG::load_obc_iertr::future<>
 PG::with_clone_obc(hobject_t oid, with_obc_func_t&& func)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   assert(!oid.is_head());
   return with_head_obc<RWState::RWREAD>(oid.get_head(),
     [oid, func=std::move(func), this](auto head) -> load_obc_iertr::future<> {
@@ -945,6 +947,7 @@ PG::with_clone_obc(hobject_t oid, with_obc_func_t&& func)
         logger().debug("with_clone_obc: cache miss on {}", coid);
         loaded = clone->template with_promoted_lock<State>(
           [coid, clone, head, this] {
+          logger().debug("{}:{}", "with_clone_obc", __LINE__);
           return backend->load_metadata(coid).safe_then_interruptible(
             [coid, clone=std::move(clone), head=std::move(head)](auto md) mutable {
             clone->set_clone_state(std::move(md->os), std::move(head));
@@ -967,6 +970,7 @@ template<RWState::State State>
 PG::interruptible_future<>
 PG::with_existing_clone_obc(ObjectContextRef clone, with_obc_func_t&& func)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   assert(clone);
   assert(clone->get_head_obc());
   assert(!clone->get_oid().is_head());
@@ -983,6 +987,7 @@ PG::with_existing_clone_obc(ObjectContextRef clone, with_obc_func_t&& func)
 PG::load_obc_iertr::future<crimson::osd::ObjectContextRef>
 PG::load_head_obc(ObjectContextRef obc)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   return backend->load_metadata(obc->get_oid()).safe_then_interruptible(
     [obc=std::move(obc)](auto md)
     -> load_obc_ertr::future<crimson::osd::ObjectContextRef> {
@@ -1006,6 +1011,7 @@ PG::load_head_obc(ObjectContextRef obc)
 PG::load_obc_iertr::future<>
 PG::reload_obc(crimson::osd::ObjectContext& obc) const
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   assert(obc.is_head());
   return backend->load_metadata(obc.get_oid()).safe_then_interruptible<false>([&obc](auto md)
     -> load_obc_ertr::future<> {
@@ -1031,6 +1037,7 @@ PG::with_locked_obc(const hobject_t &hobj,
                     const OpInfo &op_info,
                     with_obc_func_t &&f)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   if (__builtin_expect(stopping, false)) {
     throw crimson::common::system_shutdown_exception();
   }
@@ -1063,6 +1070,7 @@ template <RWState::State State>
 PG::interruptible_future<>
 PG::with_locked_obc(ObjectContextRef obc, with_obc_func_t &&f)
 {
+  logger().debug("{}:{}", __func__, __LINE__);
   // TODO: a question from rebase: do we really need such checks when
   // the interruptible stuff is being used?
   if (__builtin_expect(stopping, false)) {
