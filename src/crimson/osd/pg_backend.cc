@@ -71,6 +71,7 @@ PGBackend::load_metadata(const hobject_t& oid)
   if (__builtin_expect(stopping, false)) {
     throw crimson::common::system_shutdown_exception();
   }
+  logger().debug("{}:{}", __func__, __LINE__);
 
   return interruptor::make_interruptible(store->get_attrs(
     coll,
@@ -78,7 +79,7 @@ PGBackend::load_metadata(const hobject_t& oid)
       [oid](auto &&attrs) -> load_metadata_ertr::future<loaded_object_md_t::ref>{
         logger().debug("{}:{}", __func__, __LINE__);
 	loaded_object_md_t::ref ret(new loaded_object_md_t());
-        logger().debug("{}:{} attrs={}", __func__, __LINE__, attrs);
+        //logger().debug("{}:{} attrs={}", __func__, __LINE__, attrs);
 	if (auto oiiter = attrs.find(OI_ATTR); oiiter != attrs.end()) {
 	  bufferlist bl = std::move(oiiter->second);
           logger().debug("{}:{}", __func__, __LINE__);
