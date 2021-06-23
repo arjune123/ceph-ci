@@ -76,9 +76,12 @@ PGBackend::load_metadata(const hobject_t& oid)
     coll,
     ghobject_t{oid, ghobject_t::NO_GEN, shard})).safe_then_interruptible(
       [oid](auto &&attrs) -> load_metadata_ertr::future<loaded_object_md_t::ref>{
+        logger().debug("{}:{}", __func__, __LINE__);
 	loaded_object_md_t::ref ret(new loaded_object_md_t());
+        logger().debug("{}:{} attrs={}", __func__, __LINE__, attrs);
 	if (auto oiiter = attrs.find(OI_ATTR); oiiter != attrs.end()) {
 	  bufferlist bl = std::move(oiiter->second);
+          logger().debug("{}:{}", __func__, __LINE__);
 	  ret->os = ObjectState(
 	    object_info_t(bl),
 	    true);
@@ -89,11 +92,15 @@ PGBackend::load_metadata(const hobject_t& oid)
 	  return crimson::ct_error::object_corrupted::make();
 	}
 	
+        logger().debug("{}:{}", __func__, __LINE__);
 	if (oid.is_head()) {
+          logger().debug("{}:{}", __func__, __LINE__);
 	  if (auto ssiter = attrs.find(SS_ATTR); ssiter != attrs.end()) {
+            logger().debug("{}:{}", __func__, __LINE__);
 	    bufferlist bl = std::move(ssiter->second);
 	    ret->ss = SnapSet(bl);
 	  } else {
+            logger().debug("{}:{}", __func__, __LINE__);
 	    /* TODO: add support for writing out snapsets
 	    logger().error(
 	      "load_metadata: object {} present but missing snapset",
@@ -104,6 +111,7 @@ PGBackend::load_metadata(const hobject_t& oid)
 	  }
 	}
 
+        logger().debug("{}:{}", __func__, __LINE__);
 	return load_metadata_ertr::make_ready_future<loaded_object_md_t::ref>(
 	  std::move(ret));
       }, crimson::ct_error::enoent::handle([oid] {
