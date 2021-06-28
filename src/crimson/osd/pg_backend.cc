@@ -79,21 +79,14 @@ PGBackend::load_metadata(const hobject_t& oid)
       [oid](auto &&attrs) -> load_metadata_ertr::future<loaded_object_md_t::ref>{
         logger().debug("{}:{}", __func__, __LINE__);
 	loaded_object_md_t::ref ret(new loaded_object_md_t());
-        bool found = false;
-        for (auto& [k, v] : attrs) {
-          logger().debug("{}:{} k={}", __func__, __LINE__, k);
-          logger().debug("{}:{} v={}", __func__, __LINE__, v);
-          if (k == OI_ATTR) {
-            logger().debug("{}:{}", __func__, __LINE__);
-	    bufferlist bl = std::move(v);
-            logger().debug("{}:{}", __func__, __LINE__);
-	    ret->os = ObjectState(
-	      object_info_t(bl),
-	      true);
-            break;
-          }
-        }
-	if (!found) {
+        //logger().debug("{}:{} attrs={}", __func__, __LINE__, attrs);
+	if (auto oiiter = attrs.find(OI_ATTR); oiiter != attrs.end()) {
+	  bufferlist bl = std::move(oiiter->second);
+          logger().debug("{}:{}", __func__, __LINE__);
+	  ret->os = ObjectState(
+	    object_info_t(bl),
+	    true);
+	} else {
 	  logger().error(
 	    "load_metadata: object {} present but missing object info",
 	    oid);
