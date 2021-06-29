@@ -485,6 +485,8 @@ void PeeringState::set_last_peering_reset()
 
 void PeeringState::complete_flush()
 {
+  psdout(20) << __func__ << ": flushes_in_progress " << flushes_in_progress
+             << dendl;
   flushes_in_progress--;
   if (flushes_in_progress == 0) {
     pl->on_flushed();
@@ -4666,10 +4668,12 @@ boost::statechart::result PeeringState::Reset::react(const AdvMap& advmap)
 boost::statechart::result PeeringState::Reset::react(const ActMap&)
 {
   DECLARE_LOCALS;
+  psdout(10) << "Reset reacts on ActMMap" << dendl;
   if (ps->should_send_notify() && ps->get_primary().osd >= 0) {
     ps->info.history.refresh_prior_readable_until_ub(
       pl->get_mnow(),
       ps->prior_readable_until_ub);
+    psdout(10) << "Reset sends notify" << dendl;
     context< PeeringMachine >().send_notify(
       ps->get_primary().osd,
       pg_notify_t(
@@ -6522,6 +6526,7 @@ boost::statechart::result PeeringState::Stray::react(const MInfoRec& infoevt)
 boost::statechart::result PeeringState::Stray::react(const MQuery& query)
 {
   DECLARE_LOCALS;
+  psdout(10) << "Stray reacts on MQuery" << dendl;
   ps->fulfill_query(query, context<PeeringMachine>().get_recovery_ctx());
   return discard_event();
 }
@@ -6529,6 +6534,7 @@ boost::statechart::result PeeringState::Stray::react(const MQuery& query)
 boost::statechart::result PeeringState::Stray::react(const ActMap&)
 {
   DECLARE_LOCALS;
+  psdout(10) << "Stray reacts on ActMap" << dendl;
   if (ps->should_send_notify() && ps->get_primary().osd >= 0) {
     ps->info.history.refresh_prior_readable_until_ub(
       pl->get_mnow(), ps->prior_readable_until_ub);
