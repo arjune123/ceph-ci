@@ -2287,10 +2287,9 @@ fi
 
 %if %{with jaeger}
 %files -n libjaeger
-%defattr(-,root,root)
-%{_libdir}/libopentracing.so.*
-%{_libdir}/libthrift.so.*
-%{_libdir}/libjaegertracing.so.*
+%{buildroot}%{_libdir}/libopentracing.so.*
+%{buildroot}%{_libdir}/libthrift.so.*
+%{buildroot}%{_libdir}/libjaegertracing.so.*
 %post -n libjaeger -p /sbin/ldconfig
 %postun -n libjaeger -p /sbin/ldconfig
 %endif
