@@ -65,14 +65,14 @@ function(build_jaeger)
 
   if(CMAKE_MAKE_PROGRAM MATCHES "make")
     # try to inherit command line arguments passed by parent "make" job
-    set(make_cmd $(MAKE) Jaeger)
+    set(make_cmd $(MAKE) jaegertracing)
   else()
-    set(make_cmd ${CMAKE_COMMAND} --build <BINARY_DIR> --target Jaeger)
+    set(make_cmd ${CMAKE_COMMAND} --build <BINARY_DIR> --target jaegertracing)
   endif()
   set(install_cmd ${CMAKE_MAKE_PROGRAM} install)
 
   include(ExternalProject)
-  ExternalProject_Add(Jaeger
+  ExternalProject_Add(jaegertracing
     SOURCE_DIR ${Jaeger_SOURCE_DIR}
     UPDATE_COMMAND ""
     INSTALL_DIR "external"
