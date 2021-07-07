@@ -425,6 +425,7 @@ add_library(common-objs OBJECT ${libcommon_files})
 add_dependencies(common-objs legacy-option-headers)
 
 if(WITH_JAEGER)
+  include(BuildJaeger)
   find_package(yaml-cpp 0.6.0)
   if(NOT yaml-cpp_FOUND)
     include(Buildyaml-cpp)
@@ -435,12 +436,10 @@ if(WITH_JAEGER)
     execute_process(COMMAND bash -c "grep -q 'yaml-cpp' debian/libjaeger.install || echo 'usr/lib/libyaml-cpp.so.*' >> debian/libjaeger.install"
 		    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     set_library_properties_for_external_project(yaml-cpp::yaml-cpp yaml-cpp)
-    list(APPEND dependencies "yaml-cpp")
     set(jaeger_base yaml-cpp::yaml-cpp)
   endif()
 
-  include(BuildJaeger)
-  set(jaeger_base ${jaeger_base}
+  list(APPEND jaeger_base ${jaeger_base}
   opentracing::libopentracing
   jaegertracing::libjaegertracing)
   include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
