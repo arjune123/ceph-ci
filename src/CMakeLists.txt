@@ -449,7 +449,6 @@ if(WITH_JAEGER)
   target_link_libraries(jaeger-base INTERFACE
   yaml-cpp::yaml-cpp
   opentracing::libopentracing
-  thrift::libthrift
   jaegertracing::libjaegertracing)
   include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
   #with CMake 3.12+ the following can be replaced by:
@@ -458,8 +457,7 @@ if(WITH_JAEGER)
     ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0
     ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0.6.1
     ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1
-    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1.6.0
-    ${CMAKE_BINARY_DIR}/external/lib/libthrift.so.0.13.0)
+    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1.6.0)
   install(FILES ${jaeger_libs}
     DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
