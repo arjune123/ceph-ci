@@ -160,6 +160,9 @@ seastar::future<Ref<PG>> RemotePeeringEvent::get_pg()
     return with_blocking_future(
       osd.get_or_create_pg(
 	pgid, evt.get_epoch_sent(), std::move(evt.create_info)));
+  }).finally([this] {
+    logger().debug("{}: OSDState is {}", *this, osd.state);
+    ceph_assert(osd.state.is_active());
   });
 }
 

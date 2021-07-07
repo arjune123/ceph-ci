@@ -80,8 +80,10 @@ class OSD final : public crimson::net::Dispatcher,
   std::unique_ptr<crimson::os::FuturizedStore> store;
   std::unique_ptr<OSDMeta> meta_coll;
 
+public:
   OSDState state;
 
+private:
   /// _first_ epoch we were marked up (after this process started)
   epoch_t boot_epoch = 0;
   /// _most_recent_ epoch we were marked up
