@@ -1050,10 +1050,11 @@ seastar::future<> OSD::committed_osd_maps(version_t first,
 {
   logger().info("osd.{}: committed_osd_maps({}, {})", whoami, first, last);
   // advance through the new maps
+  const bool is_noup = osdmap->is_noup(whoami);
   return seastar::do_for_each(boost::make_counting_iterator(first),
                               boost::make_counting_iterator(last + 1),
-                              [this](epoch_t cur) {
-    return get_map(cur).then([this](cached_map_t&& o) {
+                              [this, is_noup](epoch_t cur) {
+    return get_map(cur).then([this, is_noup](cached_map_t&& o) {
       osdmap = std::move(o);
       shard_services.update_map(osdmap);
       if (up_epoch == 0 &&
@@ -1063,6 +1064,11 @@ seastar::future<> OSD::committed_osd_maps(version_t first,
         if (!boot_epoch) {
           boot_epoch = osdmap->get_epoch();
         }
+      }
+      if (is_noup != osdmap->is_noup(whoami)) {
+        logger().info("osd.{}: NOUP flag changed in {} when we was in {}",
+                      whoami, osdmap->get_epoch(), state);
+        ceph_assert(!state.is_booting());
       }
     });
   }).then([m, this] {
