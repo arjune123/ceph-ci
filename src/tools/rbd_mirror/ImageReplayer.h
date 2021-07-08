@@ -263,6 +263,7 @@ private:
   void unregister_admin_socket_hook();
   void reregister_admin_socket_hook();
   void remove_image_status(bool force, Context *on_finish);
+  void remove_image_status_remote(bool force, Context *on_finish);
 
 };
 
