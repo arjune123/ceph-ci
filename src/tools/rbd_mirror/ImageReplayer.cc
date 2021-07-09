@@ -964,6 +964,14 @@ void ImageReplayer<I>::handle_shut_down(int r) {
     return;
   }
 
+  if (!m_in_flight_op_tracker.empty()) {
+    dout(15) << "waiting for in-flight operations to complete" << dendl;
+    m_in_flight_op_tracker.wait_for_ops(new LambdaContext([this, r](int) {
+        handle_shut_down(r);
+      }));
+    return;
+  }
+
   if (!m_status_removed) {
     auto ctx = new LambdaContext([this, r](int) {
       m_status_removed = true;
@@ -988,14 +996,6 @@ void ImageReplayer<I>::handle_shut_down(int r) {
     req->send();
     return;
    }
-
-  if (!m_in_flight_op_tracker.empty()) {
-    dout(15) << "waiting for in-flight operations to complete" << dendl;
-    m_in_flight_op_tracker.wait_for_ops(new LambdaContext([this, r](int) {
-        handle_shut_down(r);
-      }));
-    return;
-  }
 
   if (m_state_builder != nullptr) {
     m_state_builder->destroy();
@@ -1153,21 +1153,7 @@ template <typename I>
 void ImageReplayer<I>::remove_image_status(bool force, Context *on_finish)
 {
   auto ctx = new LambdaContext([this, force, on_finish](int) {
-    if (m_remote_image_peer.mirror_status_updater != nullptr &&
-        m_remote_image_peer.mirror_status_updater->exists(m_global_image_id)) {
-      dout(15) << "removing remote mirror image status" << dendl;
-      if (force) {
-        m_remote_image_peer.mirror_status_updater->remove_mirror_image_status(
-          m_global_image_id, true, on_finish);
-      } else {
-        m_remote_image_peer.mirror_status_updater->remove_refresh_mirror_image_status(
-          m_global_image_id, on_finish);
-      }
-      return;
-    }
-    if (on_finish) {
-      on_finish->complete(0);
-    }
+    remove_image_status_remote(force, on_finish);
   });
 
   if (m_local_status_updater->exists(m_global_image_id)) {
@@ -1183,6 +1169,26 @@ void ImageReplayer<I>::remove_image_status(bool force, Context *on_finish)
   }
 
   ctx->complete(0);
+}
+
+template <typename I>
+void ImageReplayer<I>::remove_image_status_remote(bool force, Context *on_finish)
+{
+  if (m_remote_image_peer.mirror_status_updater != nullptr &&
+      m_remote_image_peer.mirror_status_updater->exists(m_global_image_id)) {
+    dout(15) << "removing remote mirror image status" << dendl;
+    if (force) {
+      m_remote_image_peer.mirror_status_updater->remove_mirror_image_status(
+        m_global_image_id, true, on_finish);
+    } else {
+      m_remote_image_peer.mirror_status_updater->remove_refresh_mirror_image_status(
+        m_global_image_id, on_finish);
+    }
+    return;
+  }
+  if (on_finish) {
+    on_finish->complete(0);
+  }
 }
 
 template <typename I>
