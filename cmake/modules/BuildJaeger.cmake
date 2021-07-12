@@ -46,7 +46,7 @@ function(build_jaeger)
 			-DCMAKE_FIND_ROOT_PATH=${CMAKE_BINARY_DIR}/external\;${CMAKE_BINARY_DIR}/boost\;${CMAKE_BINARY_DIR}/boost/include
 			-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/boost\;${CMAKE_BINARY_DIR}/boost/include\;${CMAKE_BINARY_DIR}/external
 			-DCMAKE_INSTALL_LIBDIR=${CMAKE_BINARY_DIR}/external/lib
-			-DBOOST_INCLUDEDIR=${CMAKE_BINARY_DIR}/boost/include
+			-DBoost_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/boost/include
 			-Dthrift_HOME=${CMAKE_BINARY_DIR}/external
 			-DOpenTracing_HOME=${CMAKE_BINARY_DIR}/external)
 
