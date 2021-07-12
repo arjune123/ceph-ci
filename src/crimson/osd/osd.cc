@@ -1073,9 +1073,12 @@ seastar::future<> OSD::committed_osd_maps(version_t first,
       }
     });
   }).then([m, this] {
-    if (osdmap->is_up(whoami) &&
-        osdmap->get_addrs(whoami) == public_msgr->get_myaddrs() &&
-        bind_epoch < osdmap->get_up_from(whoami)) {
+    const auto is_up = osdmap->is_up(whoami);
+    const auto up_from = osdmap->get_up_from(whoami);
+    logger().debug("osd.{}: bind_epoch {}, is_up {}, up_from {}",
+                   whoami, is_up, up_from);
+    if (is_up && bind_epoch < up_from &&
+        osdmap->get_addrs(whoami) == public_msgr->get_myaddrs()) {
       if (state.is_booting()) {
         logger().info("osd.{}: activating...", whoami);
         state.set_active();
