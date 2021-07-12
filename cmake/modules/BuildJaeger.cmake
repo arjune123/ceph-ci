@@ -47,11 +47,16 @@ function(build_jaeger)
 			-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/boost\;${CMAKE_BINARY_DIR}/boost/include\;${CMAKE_BINARY_DIR}/external
 			-DCMAKE_INSTALL_LIBDIR=${CMAKE_BINARY_DIR}/external/lib
 			-DBoost_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/boost/include
+                       -DBOOST_ROOT=${CMAKE_BINARY_DIR}/boost
 			-Dthrift_HOME=${CMAKE_BINARY_DIR}/external
 			-DOpenTracing_HOME=${CMAKE_BINARY_DIR}/external)
 
   # build these libraries along with jaeger
   set(dependencies opentracing)
+  if(NOT WITH_SYSTEM_BOOST)
+    list(APPEND dependencies Boost)
+  endif()
+  message(STATUS "dependencies ${dependencies}")
   include(BuildOpenTracing)
   build_opentracing()
   find_package(thrift 0.13.0)
@@ -84,14 +89,15 @@ function(build_jaeger)
     DEPENDS "${dependencies}"
     BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so
     )
+
+  set_library_properties_for_external_project(opentracing::libopentracing
+  opentracing)
+  set_library_properties_for_external_project(jaegertracing::libjaegertracing
+  jaegertracing)
+  if(NOT thrift_FOUND)
+  set_library_properties_for_external_project(thrift::libthrift thrift)
+  set(jaeger_base ${jaeger_base} thrift::libthrift PARENT_SCOPE)
+  endif()
 endfunction()
 
 build_jaeger()
-set_library_properties_for_external_project(opentracing::libopentracing
-  opentracing)
-set_library_properties_for_external_project(jaegertracing::libjaegertracing
-jaegertracing)
-if(NOT thrift_FOUND)
-set_library_properties_for_external_project(thrift::libthrift thrift)
-set(jaeger_base ${jaeger_base} thrift::libthrift PARENT_SCOPE)
-endif()
