@@ -380,6 +380,30 @@ if(WITH_SEASTAR)
   add_subdirectory(crimson)
 endif()
 
+if(WITH_JAEGER)
+  include(BuildJaeger)
+  build_jaeger()
+  find_package(yaml-cpp 0.6.0 REQUIRED)
+  list(APPEND jaeger_base ${jaeger_base}
+  opentracing::libopentracing
+  jaegertracing::libjaegertracing)
+  include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
+  # for testing jaeger
+  add_custom_target(jaeger_base DEPENDS ${jaeger_base})
+
+  add_library(jaeger-base INTERFACE)
+  target_link_libraries(jaeger-base INTERFACE ${jaeger_base})
+  include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
+
+  list(APPEND jaeger_libs
+    ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0
+    ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0.6.1
+    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1
+    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1.6.0)
+  install(FILES ${jaeger_libs}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 include(CheckTypeSize)
 set(CMAKE_EXTRA_INCLUDE_FILES "sys/time.h")
 CHECK_TYPE_SIZE(suseconds_t SUSECONDS_T)
@@ -418,39 +442,13 @@ set(libcommon_files
   ${mds_files})
 if(WITH_JAEGER)
   list(APPEND libcommon_files common/tracer.cc)
+  set_source_files_properties(osd/OpRequest.cc
+  APPEND PROPERTY OBJECT_DEPENDS jaegertracing)
 endif()
 set_source_files_properties(ceph_ver.c
   APPEND PROPERTY OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/src/include/ceph_ver.h)
 add_library(common-objs OBJECT ${libcommon_files})
 add_dependencies(common-objs legacy-option-headers)
-
-if(WITH_JAEGER)
-  include(BuildJaeger)
-  find_package(yaml-cpp 0.6.0 REQUIRED)
-  list(APPEND jaeger_base ${jaeger_base}
-  opentracing::libopentracing
-  jaegertracing::libjaegertracing)
-  build_jaeger()
-  include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
-  # with CMake 3.12+ the above can be replaced by:
-  # target_link_libraries(common-objs jaeger-base)
-  # for testing jaeger builds
-  add_custom_target(jaeger_base DEPENDS ${jaeger_base})
-
-  add_library(jaeger-base INTERFACE)
-  target_link_libraries(jaeger-base INTERFACE ${jaeger_base})
-  include_directories(SYSTEM ${CMAKE_BINARY_DIR}/external/include)
-  add_dependencies(common-objs ${jaeger_base})
-  target_link_libraries(common-objs jaeger-base)
-
-  list(APPEND jaeger_libs
-    ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0
-    ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so.0.6.1
-    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1
-    ${CMAKE_BINARY_DIR}/external/lib/libopentracing.so.1.6.0)
-  install(FILES ${jaeger_libs}
-    DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endif()
 
 CHECK_C_COMPILER_FLAG("-fvar-tracking-assignments" HAS_VTA)
 add_subdirectory(auth)

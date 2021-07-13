@@ -43,8 +43,8 @@ function(build_jaeger)
 			-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE
 			-DOpenTracing_DIR=${CMAKE_SOURCE_DIR}/src/jaegertracing/opentracing-cpp
 			-Dnlohmann_json_DIR=/usr/lib
-			-DCMAKE_FIND_ROOT_PATH=${CMAKE_BINARY_DIR}/external\;${CMAKE_BINARY_DIR}/boost\;${CMAKE_BINARY_DIR}/boost/include
-			-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/boost\;${CMAKE_BINARY_DIR}/boost/include\;${CMAKE_BINARY_DIR}/external
+			-DCMAKE_FIND_ROOT_PATH=${CMAKE_BINARY_DIR}/external
+			-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/external
 			-DCMAKE_INSTALL_LIBDIR=${CMAKE_BINARY_DIR}/external/lib
 			-DBoost_INCLUDE_DIRS=${CMAKE_BINARY_DIR}/boost/include
                        -DBOOST_ROOT=${CMAKE_BINARY_DIR}/boost
@@ -56,7 +56,6 @@ function(build_jaeger)
   if(NOT WITH_SYSTEM_BOOST)
     list(APPEND dependencies Boost)
   endif()
-  message(STATUS "dependencies ${dependencies}")
   include(BuildOpenTracing)
   build_opentracing()
   find_package(thrift 0.13.0)
@@ -99,5 +98,3 @@ function(build_jaeger)
   set(jaeger_base ${jaeger_base} thrift::libthrift PARENT_SCOPE)
   endif()
 endfunction()
-
-build_jaeger()
