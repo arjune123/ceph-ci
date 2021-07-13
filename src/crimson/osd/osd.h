@@ -243,6 +243,9 @@ public:
   void update_heartbeat_peers();
 
   friend class PGAdvanceMap;
+
+  RemotePeeringEvent::OSDPipeline peering_request_osd_pipeline;
+  std::optional<seastar::shared_promise<>> wait_for_active;
 };
 
 inline std::ostream& operator<<(std::ostream& out, const OSD& osd) {
