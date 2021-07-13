@@ -74,6 +74,7 @@ function(build_jaeger)
     set(make_cmd ${CMAKE_COMMAND} --build <BINARY_DIR> --target jaegertracing)
   endif()
   set(install_cmd ${CMAKE_MAKE_PROGRAM} install)
+  message(STATUS "install cmd ${install_cmd}")
 
   include(ExternalProject)
   ExternalProject_Add(jaegertracing
@@ -85,7 +86,8 @@ function(build_jaeger)
     BINARY_DIR ${Jaeger_BINARY_DIR}
     BUILD_COMMAND ${make_cmd}
     INSTALL_COMMAND ${install_cmd}
-    DEPENDS "${dependencies}"
+    TEST_AFTER_INSTALL TRUE
+    DEPENDS ${dependencies}
     BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/external/lib/libjaegertracing.so
     )
 
