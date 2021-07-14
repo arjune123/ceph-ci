@@ -237,6 +237,10 @@ if(WITH_CEPHFS_JAVA)
   add_subdirectory(java)
 endif()
 
+if(WITH_CPP_REDIS)
+  add_subdirectory(cpp_redis)
+endif()
+
 # Python stuff
 option(WITH_PYTHON2 "build python2 bindings" OFF)
 if(WITH_PYTHON2)
@@ -379,8 +383,6 @@ set(ceph_common_deps
   ${Backtrace_LIBRARIES}
   ${BLKIN_LIBRARIES}
   ${CRYPTO_LIBS}
-  ${CPP_REDIS_LIBRARIES}
-  ${TACOPIE_LIBRARIES}
   ${GSSAPI_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${CMAKE_DL_LIBS})
@@ -675,6 +677,10 @@ if(WITH_LIBCEPHFS)
   add_library(cephfs ${CEPH_SHARED} ${libcephfs_srcs})
   target_link_libraries(cephfs PRIVATE client ceph-common
     ${CRYPTO_LIBS} ${EXTRALIBS})
+  if(WITH_CPP_REDIS)
+    target_include_directories(cephfs PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/includes")
+    target_include_directories(cephfs PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/tacopie/includes")
+  endif()
 if(WITH_BOOST_CONTEXT)
     target_include_directories(cephfs PRIVATE
       $<TARGET_PROPERTY:spawn,INTERFACE_INCLUDE_DIRECTORIES>)

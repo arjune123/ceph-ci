@@ -33,7 +33,7 @@
 /*datacache*/
 #include <fcntl.h>
 #include <aio.h>
-#include <cpp_redis/cpp_redis>
+#include "cpp_redis/cpp_redis"
 #include "rgw_cacherequest.h"
 #include "rgw_directory.h"
 #include "rgw_cache.h"

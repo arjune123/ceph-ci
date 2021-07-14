@@ -134,6 +134,12 @@ add_library(common-common-objs OBJECT
 # retrieved OpenSSL location. This is especially important when cross
 # compiling (e.g. targeting Windows).
 target_include_directories(common-common-objs PRIVATE ${OPENSSL_INCLUDE_DIR})
+
+if(WITH_CPP_REDIS)
+  target_include_directories(common-common-objs PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/includes")
+  target_include_directories(common-common-objs PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/tacopie/includes")
+endif()
+
 # for options.cc
 target_compile_definitions(common-common-objs PRIVATE
   "CEPH_LIBDIR=\"${CMAKE_INSTALL_FULL_LIBDIR}\""

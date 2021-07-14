@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <sstream>
 #include "rgw_common.h"
-#include <cpp_redis/cpp_redis>
+#include "cpp_redis/cpp_redis"
 #include <string>
 #include <iostream>
 #include <vector>

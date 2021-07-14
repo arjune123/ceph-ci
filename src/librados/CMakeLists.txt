@@ -10,6 +10,11 @@ if(WITH_BOOST_CONTEXT)
       $<TARGET_PROPERTY:spawn,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
+if(WITH_CPP_REDIS)
+  target_include_directories(librados_impl PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/includes")
+  target_include_directories(librados_impl PUBLIC "${CMAKE_SOURCE_DIR}/src/cpp_redis/tacopie/includes")
+endif()
+
 # C/C++ API
 add_library(librados ${CEPH_SHARED}
   librados_c.cc
